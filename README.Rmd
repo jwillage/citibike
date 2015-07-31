@@ -1,0 +1,9 @@
+---
+title: "Citi Bike Data Analysis"
+output: html_document
+---
+
+The set of files included are an exploratory data analysis of the publicly
+provided Citi Bike data available [here.](http://www.citibikenyc.com/system-data)
+Citi Bike is a bike sharing system in New York City that lets riders rent 
+bikes for commuting purposes.
