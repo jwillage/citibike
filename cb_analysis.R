@@ -9,8 +9,8 @@ startYear <- "2013"
 #need to tack a day onto the date in order to use lubridate/strptime
 start <- ymd(paste(startYear, startMonth, "01"))
 #endMonth <- paste0(year(today()), sprintf("%02d", month(today())))
-endMonth <- "06"
-endYear <- "2015"
+endMonth <- "09"
+endYear <- "2013"
 end <- ymd(paste(endYear, endMonth, "01"))
 
 months <- seq(start, end, by = "1 month")
