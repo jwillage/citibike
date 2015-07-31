@@ -7,3 +7,10 @@ The set of files included are an exploratory data analysis of the publicly
 provided Citi Bike data available [here.](http://www.citibikenyc.com/system-data)
 Citi Bike is a bike sharing system in New York City that lets riders rent 
 bikes for commuting purposes.
+
+##TODO##
+Integrate distance data using [Google Maps Directions API][1]. Make a web
+call, a la:  
+https://maps.googleapis.com/maps/api/directions/json?origin=98%20suffolk%20st%20nyc&destination=164%20Bedford%20Avenue&mode=bicycling
+
+[1]: https://developers.google.com/maps/documentation/directions/intro
