@@ -19,7 +19,9 @@ magnitude. Instead of every hour of the month, maybe:
     * break into hour intervals by station (24 * 330 rows/file).  
     * Or days by station (30 * 330 rows/file).  
     * By start station and end station combinations (< (330^2) since people will 
-  not pick up in BK and return in midtown, for example)
+  not pick up in BK and return in midtown, for example)  
+*  Lifetime of bicycle. Track bike by ID and see which bikes accumlate more miles, are they taken out of rotation?  
+*  Use average speed to determine bike friendliness of an a neighborhood. Use average speed vs traffic to determine if bike or car is faster as certain points throughout the day.
 
 
 [1]: https://developers.google.com/maps/documentation/directions/intro
