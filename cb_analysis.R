@@ -1,19 +1,35 @@
 library(lubridate)
 library(data.table)
 library(jsonlite)
+library(tidyr)
 
 stationDistance <- function(startLat, startLon, endLat, endLon){
+  #cannot be vectorized, error during call of more than 1 row
   url <- "https://maps.googleapis.com/maps/api/directions/json?mode=bicycling"
   url <- paste0(url, "&origin=", startLat, ",", startLon, 
                 "&destination=", endLat, ",", endLon)
   doc <- fromJSON(url)
-
+  
   dist <- doc$routes$legs[[1]]$distance$text
   duration <- doc$routes$legs[[1]]$duration$text 
-  
   c(dist, duration)
 }
 
+stationDistanceX <- function(startLat, startLon, endLat, endLon){
+  url <- "https://maps.googleapis.com/maps/api/directions/xml?mode=bicycling"
+  url <- paste0(url, "&origin=", startLat, ",", startLon, 
+                "&destination=", endLat, ",", endLon)
+  
+  xData <- getURL(url)
+  
+  doc <- xmlTreeParse(xData)
+  rootNode <- xmlRoot(doc)
+ 
+  xmlValue(rootNode[[2]][["leg"]][["distance"]][["text"]][["text"]])
+  #xmlValue(rootNode[[2]][["leg"]][["duration"]][["text"]][["text"]])
+
+#  c(dist, duration)
+}
 
 
 #Download trip data from Citi Bikes website. Datasets are available per month,
@@ -92,9 +108,28 @@ for (m in 1:length(months)){
     tmp.trip$stoptime <- mdy_hm(tmp$stoptime)
   }
   
+  
   dat <- rbind(dat, tmp.trip)
   stations <- unique(rbind(stations, tmp.station))
   
+  #calculate all combinations of stations and the distance between them,
+  #then map them back to each rider
+  comb <- as.data.frame(levels(interaction(paste(stations$start.station.id, 
+                                   stations$start.station.name,
+                                   stations$start.station.latitude, 
+                                   stations$start.station.longitude, sep = ";"), 
+                             paste(stations$start.station.id, 
+                                   stations$start.station.name,
+                                   stations$start.station.latitude, 
+                                   stations$start.station.longitude, sep = ";")
+                             , sep = ";")))
+  names(comb) <- "x"
+  
+  comb <- separate(comb, x, c("start.station.id", "start.station.name", "start.station.latitude" 
+                        ,"start.station.longitude" , "end.station.id" , "end.station.name" ,
+                        "end.station.latitude" ,
+                         "end.station.longitude"), sep = ";")
+                        
     #danger
   #file.remove(list.files())
 
@@ -103,7 +138,7 @@ for (m in 1:length(months)){
 rm(list = c("tmp", "tmp.trip", "tmp.station"))
 
 setnames(dat, make.names(names(dat)))
-
+setnames(stations, make.names(names(stations)))
 
 dat$birth.year <- as.numeric(dat$birth.year)
 dat$tripduration <- as.numeric(dat$tripduration)
@@ -111,4 +146,3 @@ dat$tripduration <- as.numeric(dat$tripduration)
 #average duration by customer type. Divide by 60 to convert from sec to min
 dat[, mean(tripduration/60, na.rm = T), by = usertype]
 
-tripDistance()

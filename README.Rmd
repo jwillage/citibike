@@ -8,11 +8,11 @@ provided Citi Bike data available [here.](http://www.citibikenyc.com/system-data
 Citi Bike is a bike sharing system in New York City that lets riders rent 
 bikes for commuting purposes.
 
-##Files##
+##Files  
 *  **cb_analysis.R** - R data processing and exploration
 *  **README.Rmd** - this file  
 
-###cb_analysis.R###  
+###cb_analysis.R     
 Downloads and reads in all the historical trip data from Citi Bike. The format 
 of data has changed several times, so files in certain date ranges need to be 
 handled differently. This specifically relates to the format of the filename and 
@@ -32,9 +32,8 @@ University Pl & E 14 St
 
 
 ##TODO##
-*  Integrate distance data using [Google Maps Directions API][1]. Make a web
-call, i.e.:  
-https://maps.googleapis.com/maps/api/directions/json?origin=98%20suffolk%20st%20nyc&destination=164%20Bedford%20Avenue&mode=bicycling  
+*  Move station interaction/creation before loop. Need a master station file, 
+probably the most recent data file
 *  Add speed as a function of distance and duration
 *  Aggregate each month's file at a time. Not enough memory to load entire data
 set then aggregate. Average month has ~650K rows. Even grouping by hour and 
@@ -52,4 +51,3 @@ magnitude. Instead of every hour of the month, maybe:
 communication
 
 
-[1]: https://developers.google.com/maps/documentation/directions/intro
