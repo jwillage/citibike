@@ -32,6 +32,7 @@ University Pl & E 14 St
 
 
 ##TODO##
+*  Right-type dat columns for space efficiency
 *  Move station interaction/creation before loop. Need a master station file, 
 probably the most recent data file
 *  Add speed as a function of distance and duration
