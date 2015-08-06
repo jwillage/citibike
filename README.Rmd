@@ -34,7 +34,10 @@ University Pl & E 14 St
 ##TODO##
 *  Right-type dat columns for space efficiency
 *  Move station interaction/creation before loop. Need a master station file, 
-probably the most recent data file
+probably the most recent data file. Start with that, if any stations are not 
+found, then make a separate call to stationDistance(X).
+*  Think about creating a separate function that has IF statements and reads
+files. Then the loop is more versatile and simplified to calling functions.  
 *  Add speed as a function of distance and duration
 *  Aggregate each month's file at a time. Not enough memory to load entire data
 set then aggregate. Average month has ~650K rows. Even grouping by hour and 

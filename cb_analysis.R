@@ -20,47 +20,28 @@ stationDistanceX <- function(startLat, startLon, endLat, endLon){
   url <- paste0(url, "&origin=", startLat, ",", startLon, 
                 "&destination=", endLat, ",", endLon)
   
-  xData <- getURL(url)
+#  xData <- getURL(url)
   
-  doc <- xmlTreeParse(xData)
-  rootNode <- xmlRoot(doc)
+#  doc <- xmlTreeParse(xData)
+#  rootNode <- xmlRoot(doc)
  
   xmlValue(rootNode[[2]][["leg"]][["distance"]][["text"]][["text"]])
   #xmlValue(rootNode[[2]][["leg"]][["duration"]][["text"]][["text"]])
 
-#  c(dist, duration)
+  #c(dist, duration)
+  c(1, 2)
 }
 
-
-#Download trip data from Citi Bikes website. Datasets are available per month,
-#begining July 2013, when the service launched.
-startMonth <- "07"
-startYear <- "2013"
-#need to tack a day onto the date in order to use lubridate/strptime
-start <- ymd(paste(startYear, startMonth, "01"))
-#endMonth <- paste0(year(today()), sprintf("%02d", month(today())))
-endMonth <- "09"
-endYear <- "2013"
-end <- ymd(paste(endYear, endMonth, "01"))
-
-months <- seq(start, end, by = "1 month")
-
-dat <- data.table()
-stations <- data.table()
-
-for (m in 1:length(months)){
-  dt <- paste0(year(months[m]), sprintf("%02d", month(months[m])))
-  u <- paste0("https://s3.amazonaws.com/tripdata/", dt, 
-              "-citibike-tripdata.zip")
-
+processMonth <- function(inMonth, inYear){
   if (months[m] < "2014-08-02"){ #old format
-    fil <- paste0("data/", year(months[m]), "-", sprintf("%02d", 
-                  month(months[m])), " - Citi Bike trip data.csv")
+    fil <- paste0("data/", inYear, "-", 
+                  sprintf("%02d", inMonth), 
+                  " - Citi Bike trip data.csv")
     
     if (!file.exists(fil)){
-        download.file(u, paste0("data/", dt, ".zip"))
-        unzip(paste0("data/", dt, ".zip"))   
-        file.remove(paste0("data/", dt, ".zip"))
+      download.file(u, paste0("data/", dt, ".zip"))
+      unzip(paste0("data/", dt, ".zip"))   
+      file.remove(paste0("data/", dt, ".zip"))
     }
     
     tmp <- fread(fil, na.strings = "\\N")
@@ -68,7 +49,7 @@ for (m in 1:length(months)){
     #Split into trip history and station lookup data
     tmp.trip <- tmp[, c(1:4, 8, 12:15), with = FALSE]
     tmp.station <- tmp[, c(4, 5, 6, 7), with = FALSE]
-                
+    
     tmp.trip$starttime <- ymd_hms(tmp$starttime)
     tmp.trip$stoptime <- ymd_hms(tmp$stoptime)
   }
@@ -108,28 +89,70 @@ for (m in 1:length(months)){
     tmp.trip$stoptime <- mdy_hm(tmp$stoptime)
   }
   
+  list(tmp.trip, tmp.station)
   
-  dat <- rbind(dat, tmp.trip)
-  stations <- unique(rbind(stations, tmp.station))
+}
+
+
+#Download trip data from Citi Bikes website. Datasets are available per month,
+#begining July 2013, when the service launched.
+startMonth <- "07"
+startYear <- "2013"
+#need to tack a day onto the date in order to use lubridate/strptime
+start <- ymd(paste(startYear, startMonth, "01"))
+#endMonth <- paste0(year(today()), sprintf("%02d", month(today())))
+endMonth <- "09"
+endYear <- "2013"
+end <- ymd(paste(endYear, endMonth, "01"))
+
+months <- seq(start, end, by = "1 month")
+
+dat <- data.table()
+stations <- data.table()
+
+
+for (m in 1:length(months)){
+  dt <- paste0(year(months[m]), sprintf("%02d", month(months[m])))
+  u <- paste0("https://s3.amazonaws.com/tripdata/", dt, 
+              "-citibike-tripdata.zip")
+
+  l <- processMonth(month(months[m]), year(months[m]))
+  
+  
+  dat <- rbind(dat, l[[1]])
+  stations <- unique(rbind(stations, l[[2]]))
+#  setnames(stations, make.names(names(stations)))
   
   #calculate all combinations of stations and the distance between them,
   #then map them back to each rider
-  comb <- as.data.frame(levels(interaction(paste(stations$start.station.id, 
-                                   stations$start.station.name,
-                                   stations$start.station.latitude, 
-                                   stations$start.station.longitude, sep = ";"), 
-                             paste(stations$start.station.id, 
-                                   stations$start.station.name,
-                                   stations$start.station.latitude, 
-                                   stations$start.station.longitude, sep = ";")
+  comb <- as.data.table(levels(interaction(paste(stations$`start station id`, 
+                                   stations$`start station name`,
+                                   stations$`start station latitude`, 
+                                   stations$`start station longitude`, sep = ";"), 
+                             paste(stations$`start station id`, 
+                                   stations$`start station name`,
+                                   stations$`start station latitude`, 
+                                   stations$`start station longitude`, sep = ";")
                              , sep = ";")))
-  names(comb) <- "x"
   
-  comb <- separate(comb, x, c("start.station.id", "start.station.name", "start.station.latitude" 
+  comb <- separate(comb, V1, c("start.station.id", "start.station.name", "start.station.latitude" 
                         ,"start.station.longitude" , "end.station.id" , "end.station.name" ,
                         "end.station.latitude" ,
                          "end.station.longitude"), sep = ";")
-                        
+  
+  #todo assign function results to multiple columns. Can this be done easily with <- notation?
+  #if not, return a list/vector of both results and then assign individually
+  #comb$distance <- 0; comb$estimatedDuration <- 0
+  #comb[, 9:10] <- with(comb, stationDistanceX(start.station.latitude, 
+
+#  comb$distance <- with(comb, stationDistanceX(start.station.latitude, 
+#                                              start.station.longitude,
+#                                              end.station.latitude, 
+#                                              end.station.longitude))
+  
+  
+  #comb$estimatedDuration
+                          
     #danger
   #file.remove(list.files())
 
