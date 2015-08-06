@@ -99,9 +99,27 @@ processMonthStation <- function(monthFile){
   
   #Split into stations
   tmp.station <- tmp[, c(4, 5, 6, 7), with = FALSE]
-  tmp.station
-}
 
+  #calculate all combinations of stations and the distance between them,
+  #in order to map them back to each rider
+  comb <- as.data.table(levels(
+             interaction(paste(tmp.station$'start station id', 
+                               tmp.station$'start station name',
+                               tmp.station$'start station latitude', 
+                               tmp.station$'start station longitude',
+                               sep = ";"), 
+                         paste(tmp.station$'start station id', 
+                               tmp.station$'start station name',
+                               tmp.station$'start station latitude', 
+                               tmp.station$'start station longitude',
+                               sep = ";")
+                         , sep = ";")))
+  
+  comb <- separate(comb, V1, c(names(tmp.station), 
+                               sub('start', 'end', names(tmp.station))), 
+                   sep = ";")
+  comb
+}
 
 #Download trip data from Citi Bikes website. Datasets are available per month,
 #begining July 2013, when the service launched.
@@ -117,28 +135,12 @@ end <- ymd(paste(endYear, endMonth, "01"))
 months <- seq(start, end, by = "1 month")
 
 dat <- data.table()
-stations <- data.table()
+stationCombs <- data.table()
 
 #process the most recent file to get the up-to-date station list
-stations <- processMonthStation(tail(months, 1))
-setnames(stations, make.names(names(stations)))
+stationCombs <- processMonthStation(tail(months, 1))
+setnames(stationCombs, make.names(names(stationCombs)))
 
-#calculate all combinations of stations and the distance between them,
-#then map them back to each rider
-comb <- as.data.table(levels(interaction(paste(stations$start.station.id, 
-                                               stations$start.station.name,
-                                               stations$start.station.latitude, 
-                                               stations$start.station.longitude,
-                                               sep = ";"), 
-                                         paste(stations$start.station.id, 
-                                               stations$start.station.name,
-                                               stations$start.station.latitude, 
-                                               stations$start.station.longitude,
-                                               sep = ";")
-                                         , sep = ";")))
-
-comb <- separate(comb, V1, c(names(stations), 
-                             sub('start', 'end', names(stations))), sep = ";")
 
 #todo assign function results to multiple columns. 
 #Can this be done easily with <- notation?
