@@ -32,6 +32,9 @@ University Pl & E 14 St
 
 
 ##TODO##
+*  Benchmark simulated vectorized function (stationDistanceX) vs data.table 'by'
+*  Test JSON version with vectorization
+*  Save station output to file so we don't have to call each time
 *  Right-type dat columns for space efficiency
 *  Add speed as a function of distance and duration
 *  Aggregate each month's file at a time. Not enough memory to load entire data

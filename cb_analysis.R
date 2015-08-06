@@ -1,6 +1,8 @@
+library(RCurl)
 library(lubridate)
 library(data.table)
 library(jsonlite)
+library(XML)
 library(tidyr)
 
 stationDistance <- function(startLat, startLon, endLat, endLon){
@@ -17,19 +19,17 @@ stationDistance <- function(startLat, startLon, endLat, endLon){
 
 stationDistanceX <- function(startLat, startLon, endLat, endLon){
   url <- "https://maps.googleapis.com/maps/api/directions/xml?mode=bicycling"
-  url <- paste0(url, "&origin=", startLat, ",", startLon, 
-                "&destination=", endLat, ",", endLon)
+  url <- paste0(url, " &origin=", startLat, ",", startLon,   
+                " &destination=", endLat, ",", endLon)
   
-#  xData <- getURL(url)
+  xData <- getURL(URLencode(url))
   
-#  doc <- xmlTreeParse(xData)
-#  rootNode <- xmlRoot(doc)
+  doc <- xmlTreeParse(xData)
+  rootNode <- xmlRoot(doc)
  
-  xmlValue(rootNode[[2]][["leg"]][["distance"]][["text"]][["text"]])
-  #xmlValue(rootNode[[2]][["leg"]][["duration"]][["text"]][["text"]])
+  c(xmlValue(rootNode[[2]][["leg"]][["distance"]][["text"]][["text"]]), 
+  xmlValue(rootNode[[2]][["leg"]][["duration"]][["text"]][["text"]]) )
 
-  #c(dist, duration)
-  c(1, 2)
 }
 
 getMonthData <- function(monthFile){
@@ -118,6 +118,19 @@ processMonthStation <- function(monthFile){
   comb <- separate(comb, V1, c(names(tmp.station), 
                                sub('start', 'end', names(tmp.station))), 
                    sep = ";")
+  setnames(comb, make.names(names(comb)))
+  
+  comb$distance <- NA
+  comb$estDuration <- NA
+
+  stationDistanceX <- Vectorize(stationDistanceX)  
+  comb[, 9:10] <- with(comb, stationDistanceX(start.station.latitude, 
+                                              start.station.longitude,
+                                              end.station.latitude, 
+                                              end.station.longitude))
+  
+  #for un-vectorized function, include by=1:nrow(t)].
+  
   comb
 }
 
@@ -139,21 +152,6 @@ stationCombs <- data.table()
 
 #process the most recent file to get the up-to-date station list
 stationCombs <- processMonthStation(tail(months, 1))
-setnames(stationCombs, make.names(names(stationCombs)))
-
-
-#todo assign function results to multiple columns. 
-#Can this be done easily with <- notation?
-#if not, return a list/vector of both results and then assign individually
-#comb$distance <- 0; comb$estimatedDuration <- 0
-#comb[, 9:10] <- with(comb, stationDistanceX(start.station.latitude, 
-
-#  comb$distance <- with(comb, stationDistanceX(start.station.latitude, 
-#                                              start.station.longitude,
-#                                              end.station.latitude, 
-#                                              end.station.longitude))
-
-#comb$estimatedDuration
 
 #get trip history for all months
 for (m in 1 : (length(months))){
