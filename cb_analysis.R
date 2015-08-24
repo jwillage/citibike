@@ -5,6 +5,18 @@ library(jsonlite)
 library(XML)
 library(tidyr)
 
+myGetURL <- function(...) {
+  rcurlEnv <- getNamespace("RCurl")
+  mapUnicodeEscapes <- get("mapUnicodeEscapes", rcurlEnv)
+  unlockBinding("mapUnicodeEscapes", rcurlEnv)
+  assign("mapUnicodeEscapes", function(str) str, rcurlEnv)
+  on.exit({
+    assign("mapUnicodeEscapes", mapUnicodeEscapes, rcurlEnv)
+    lockBinding("mapUnicodeEscapes", rcurlEnv)
+  }, add = TRUE)
+  return(getURL(...))
+}
+
 stationDistance <- function(startLat, startLon, endLat, endLon){
   #cannot be vectorized, error during call of more than 1 row
   url <- "https://maps.googleapis.com/maps/api/directions/json?mode=bicycling"
@@ -19,10 +31,11 @@ stationDistance <- function(startLat, startLon, endLat, endLon){
 
 stationDistanceX <- function(startLat, startLon, endLat, endLon){
   url <- "https://maps.googleapis.com/maps/api/directions/xml?mode=bicycling"
-  url <- paste0(url, " &origin=", startLat, ",", startLon,   
+  url <- paste0(url, "&origin=", startLat, ",", startLon,   
                 " &destination=", endLat, ",", endLon)
   
-  xData <- getURL(URLencode(url))
+ # xData <- getURL(URLencode(url))
+  xData <- myGetURL(URLencode(url))
   
   doc <- xmlTreeParse(xData)
   rootNode <- xmlRoot(doc)
@@ -91,6 +104,18 @@ processMonthTrip <- function(monthFile){
     tmp.trip$stoptime <- mdy_hm(tmp$stoptime)
   }
   
+  setnames(tmp.trip, make.names(names(tmp.trip)))
+  
+  #setkeyv is messing up start/end stations in dat
+#  setkeyv(tmp.trip, c("start.station.id", "end.station.id"))
+  
+  #only bring necessary columns from stationCombs file
+  #check tmp.trip - looks like sorted by start and end stations?
+#  fullTrip <- merge(tmp.trip, stationCombs)
+  #  fullTrip <- merge(tmp.trip, stationCombs[, 
+  #            c("start.station.id", "end.station.id", "start.station.name"), 
+  #            with = FALSE])
+
   tmp.trip
 }
 
@@ -120,18 +145,24 @@ processMonthStation <- function(monthFile){
                    sep = ";")
   setnames(comb, make.names(names(comb)))
   
-  comb$distance <- NA
-  comb$estDuration <- NA
 
   stationDistanceX <- Vectorize(stationDistanceX)  
-  comb[, 9:10] <- with(comb, stationDistanceX(start.station.latitude, 
-                                              start.station.longitude,
-                                              end.station.latitude, 
-                                              end.station.longitude))
+
+#  comb$distance <- as.character(NA)
+#  comb$estDuration <- as.character(NA)
+#  comb[1:330, 9:10] <- with(comb[1:330,], stationDistanceX(start.station.latitude, 
+#                                              start.station.longitude,
+#                                              end.station.latitude, 
+#                                              end.station.longitude))
+#for un-vectorized function, include by=1:nrow(t)].
   
-  #for un-vectorized function, include by=1:nrow(t)].
-  
-  comb
+  #7.5 hour estimate to build entire 108k list
+  de <- t(with(comb, stationDistanceX(start.station.latitude, 
+                                               start.station.longitude,
+                                               end.station.latitude, 
+                                               end.station.longitude)))
+  nc <-cbind(comb, de)
+  nc
 }
 
 #Download trip data from Citi Bikes website. Datasets are available per month,
@@ -152,6 +183,10 @@ stationCombs <- data.table()
 
 #process the most recent file to get the up-to-date station list
 stationCombs <- processMonthStation(tail(months, 1))
+setkeyv(stationCombs, c("start.station.id", "end.station.id"))
+
+#save locally
+save(stationCombs, file = "data/stationCombs.txt")
 
 #get trip history for all months
 for (m in 1 : (length(months))){
@@ -163,6 +198,6 @@ setnames(dat, make.names(names(dat)))
 dat$birth.year <- as.numeric(dat$birth.year)
 dat$tripduration <- as.numeric(dat$tripduration)
 
-#average duration by customer type. Divide by 60 to convert from sec to min
+#average duration by customer type. Divide by 60 to convert to minutes
 dat[, mean(tripduration/60, na.rm = T), by = usertype]
 
