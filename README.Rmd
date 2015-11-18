@@ -32,8 +32,7 @@ University Pl & E 14 St
 
 
 ##TODO##
-*  Benchmark simulated vectorized function (stationDistanceX) vs data.table 'by'
-*  Test JSON version with vectorization
+
 *  Right-type dat columns for space efficiency
 *  Add to trip data speed as a function of distance and duration
 *  Aggregate each month's file at a time. Not enough memory to load entire data
@@ -51,6 +50,6 @@ magnitude. Instead of every hour of the month, maybe:
 *  Cluster stations by lat/long to determine neighborhood for results 
 communication
 *  Calculate standard error of start/end combinations across all the different 
-months. Rides from station A to station B should not change much (with regard to
-duration) between months and seasons
+months. Average ride duration from station A to station B should not change much
+between months and seasons
 
