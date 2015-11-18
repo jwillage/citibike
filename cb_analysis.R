@@ -29,12 +29,11 @@ stationDistance <- function(startLat, startLon, endLat, endLon){
   c(dist, duration)
 }
 
-stationDistanceX <- function(startLat, startLon, endLat, endLon){
+stationDistanceXml <- function(startLat, startLon, endLat, endLon){
   url <- "https://maps.googleapis.com/maps/api/directions/xml?mode=bicycling"
   url <- paste0(url, "&origin=", startLat, ",", startLon,   
                 " &destination=", endLat, ",", endLon)
   
- # xData <- getURL(URLencode(url))
   xData <- myGetURL(URLencode(url))
   
   doc <- xmlTreeParse(xData)
@@ -42,8 +41,28 @@ stationDistanceX <- function(startLat, startLon, endLat, endLon){
  
   c(xmlValue(rootNode[[2]][["leg"]][["distance"]][["text"]][["text"]]), 
   xmlValue(rootNode[[2]][["leg"]][["duration"]][["text"]][["text"]]) )
-
 }
+
+
+stationDistanceMatrix <- function(startLat, startLon, endLat, endLon){
+  #restricted to using google maps
+
+  url <- "https://maps.googleapis.com/maps/api/distancematrix/xml?mode=bicycling&units=imperial"
+  
+  #key is optional for this api call
+  url <- paste0(url, "&key=", readLines("privatekey.txt"))
+  url <- paste0(url, "&origins=", startLat, ",", startLon, 
+                " &destinations=", endLat, ",", endLon)
+
+  xData <- myGetURL(URLencode(url))
+  
+  doc <- xmlTreeParse(xData)
+  rootNode <- xmlRoot(doc)
+  
+    c(xmlValue(rootNode[[4]][[1]][[2]][[2]]), 
+      xmlValue(rootNode[[4]][[1]][[3]][[2]]))
+}
+
 
 getMonthData <- function(monthFile){
   dt <- paste0(year(monthFile), sprintf("%02d", month(monthFile)))
@@ -145,23 +164,28 @@ processMonthStation <- function(monthFile){
                    sep = ";")
   setnames(comb, make.names(names(comb)))
   
-
-  stationDistanceX <- Vectorize(stationDistanceX)  
-
-#  comb$distance <- as.character(NA)
-#  comb$estDuration <- as.character(NA)
-#  comb[1:330, 9:10] <- with(comb[1:330,], stationDistanceX(start.station.latitude, 
-#                                              start.station.longitude,
-#                                              end.station.latitude, 
-#                                              end.station.longitude))
-#for un-vectorized function, include by=1:nrow(t)].
+  #vectorize whichever function is being used
+  stationDistanceMatrix <- Vectorize(stationDistanceMatrix) 
   
-  #7.5 hour estimate to build entire 108k list
-  de <- t(with(comb, stationDistanceX(start.station.latitude, 
+  df<-NULL
+
+  numStations <- sqrt(dim(comb)[1])
+  #can only make 2500 google calls a day, need to break up in smaller chunks
+  #ie 7 stations at a time (7 * 330 stations = 2310, < 2500)
+    for (i in 1:numStations){
+      estimates <- t(with(comb[((i - 1) * numStations + 1): (i * numStations), ], 
+                                 stationDistanceMatrix(start.station.latitude,
                                                start.station.longitude,
                                                end.station.latitude, 
                                                end.station.longitude)))
-  nc <-cbind(comb, de)
+      df <- rbind(df, estimates)
+  } 
+
+  nc <- cbind(comb, df)
+  names(nc)[9:10] <- c("est.time", "est.distance")
+  
+  saveRDS(nc, file = "data/distancePairs.rds")
+  
   nc
 }
 
