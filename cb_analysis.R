@@ -67,6 +67,7 @@ stationDistanceMatrix <- function(startLat, startLon, endLat, endLon){
 
 getMonthData <- function(monthFile){
   dt <- paste0(year(monthFile), sprintf("%02d", month(monthFile)))
+  #For files after Aug '15 this url is become dynamic
   u <- paste0("https://s3.amazonaws.com/tripdata/", dt, 
               "-citibike-tripdata.zip")
   
@@ -75,6 +76,7 @@ getMonthData <- function(monthFile){
                   sprintf("%02d", month(monthFile)), 
                   " - Citi Bike trip data.csv")
     
+    #read from zip
     if (!file.exists(fil)){
       download.file(u, paste0("data/", dt, ".zip"))
       unzip(paste0("data/", dt, ".zip"))   
@@ -90,7 +92,7 @@ getMonthData <- function(monthFile){
     
     if (!file.exists(fil)){
       download.file(u, paste0("data/", dt, ".zip"))
-      unzip(paste0("data/", dt, ".zip"))   
+      unzip(paste0("data/", dt, ".zip"), exdir = "data")   
       file.remove(paste0("data/", dt, ".zip"))
     }
     
@@ -119,43 +121,31 @@ processMonthTrip <- function(monthFile, distancePairs){
     tmp.trip$stoptime <- mdy_hms(tmp$stoptime)
   }
   
+  #june file does not have seconds, remove 's' from function and run
   if (monthFile > "2015-05-31"){ #current format
-    tmp.trip$starttime <- mdy_hm(tmp$starttime)
-    tmp.trip$stoptime <- mdy_hm(tmp$stoptime)
+    tmp.trip$starttime <- mdy_hms(tmp$starttime)
+    tmp.trip$stoptime <- mdy_hms(tmp$stoptime)
   }
-  
 
   setnames(tmp.trip, make.names(names(tmp.trip)))
-  tmp.trip$usertype <- as.factor(tmp.trip$usertype)
   
-  #setkeyv is messing up start/end stations in dat
-#  setkeyv(tmp.trip, c("start.station.id", "end.station.id"))
-  
-  #only bring necessary columns from stationCombs file
-  #check tmp.trip - looks like sorted by start and end stations?
-#  fullTrip <- merge(tmp.trip, stationCombs)
-  #  fullTrip <- merge(tmp.trip, stationCombs[, 
-  #            c("start.station.id", "end.station.id", "start.station.name"), 
-  #            with = FALSE])
-
   #perform any data filtering, ie searching by neighborhood, etc
   #remove trips where start station = end station if comparing to estimates
   #remove trips that were longer than 2 hours
-  tmp.trip$tripduration <- as.numeric(tmp.trip$tripduration)
-  #saveRDS(tmp.trip, "data/Sep13tmptrip.rds")
-  tmp.trip.filt <- tmp.trip[tmp.trip$tripduration < 7200, ]
   
   #join with estimates and process at the trip level, then aggregate
   trip.month <- tmp.trip %>% 
     left_join(distancePairs, by = c("start.station.id", "end.station.id")) %>%
     select(start.station.id : gender, est.time, est.distance)
-
-  trip.month$birth.year <- as.numeric(trip.month$birth.year)
-  trip.month$tripduration <- as.numeric(trip.month$tripduration)
   
-  #data frames too difficult to develop with
+  #data tables too difficult to develop with
   trip.month <- as.data.frame(trip.month)
   
+  trip.month$birth.year <- as.numeric(trip.month$birth.year)
+  trip.month$tripduration <- as.numeric(trip.month$tripduration)
+  trip.month$usertype <- as.factor(tmp.trip$usertype)
+  
+  #saveRDS(trip.month, "data/Sep13tmptrip.rds")  
   trip.month
 }
 
@@ -238,19 +228,18 @@ dat <- data.table()
 stationCombs <- data.table()
 
 #process the most recent file to get the up-to-date station list
-distancePairs <- processMonthStation(tail(months, 1))
-setkeyv(distancePairs, c("start.station.id", "end.station.id"))
+ #distancePairs <- processMonthStation(tail(months, 1))
+ #setkeyv(distancePairs, c("start.station.id", "end.station.id"))
 
 #get trip history for all months
-for (m in 1 : (length(months))){
-  dat <- rbind(dat, processMonthTrip(months[m]), distancePairs)
-}
+ #for (m in 1 : (length(months))){
+ #  dat <- rbind(dat, processMonthTrip(months[m]), distancePairs)
+ #}
 
-setnames(dat, make.names(names(dat)))
+ #setnames(dat, make.names(names(dat)))
 
-dat$birth.year <- as.numeric(dat$birth.year)
-dat$tripduration <- as.numeric(dat$tripduration)
+ #dat$birth.year <- as.numeric(dat$birth.year)
 
 #average duration by customer type. Divide by 60 to convert to minutes
-dat[, mean(tripduration/60, na.rm = T), by = usertype]
+ #dat[, mean(tripduration/60, na.rm = T), by = usertype]
 
