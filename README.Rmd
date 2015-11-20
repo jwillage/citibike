@@ -9,8 +9,10 @@ Citi Bike is a bike sharing system in New York City that lets riders rent
 bikes for commuting purposes.
 
 ##Files  
-*  **cb_analysis.R** - R data processing and exploration
+*  **cb_analysis.R** - R data processing
+*  **cb_eda.Rmd** - Exploratory analysis
 *  **README.Rmd** - this file  
+
 
 ###cb_analysis.R     
 Downloads and reads in all the historical trip data from Citi Bike. The format 
