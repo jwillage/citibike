@@ -4,6 +4,7 @@ library(data.table)
 library(jsonlite)
 library(XML)
 library(tidyr)
+library(dplyr)
 
 myGetURL <- function(...) {
   rcurlEnv <- getNamespace("RCurl")
@@ -102,7 +103,7 @@ getMonthData <- function(monthFile){
   tmp
 }
 
-processMonthTrip <- function(monthFile){
+processMonthTrip <- function(monthFile, distancePairs){
   tmp <- getMonthData(monthFile)
   
   #Split into trip history 
@@ -123,7 +124,9 @@ processMonthTrip <- function(monthFile){
     tmp.trip$stoptime <- mdy_hm(tmp$stoptime)
   }
   
+
   setnames(tmp.trip, make.names(names(tmp.trip)))
+  tmp.trip$usertype <- as.factor(tmp.trip$usertype)
   
   #setkeyv is messing up start/end stations in dat
 #  setkeyv(tmp.trip, c("start.station.id", "end.station.id"))
@@ -135,7 +138,25 @@ processMonthTrip <- function(monthFile){
   #            c("start.station.id", "end.station.id", "start.station.name"), 
   #            with = FALSE])
 
-  tmp.trip
+  #perform any data filtering, ie searching by neighborhood, etc
+  #remove trips where start station = end station if comparing to estimates
+  #remove trips that were longer than 2 hours
+  tmp.trip$tripduration <- as.numeric(tmp.trip$tripduration)
+  #saveRDS(tmp.trip, "data/Sep13tmptrip.rds")
+  tmp.trip.filt <- tmp.trip[tmp.trip$tripduration < 7200, ]
+  
+  #join with estimates and process at the trip level, then aggregate
+  trip.month <- tmp.trip %>% 
+    left_join(distancePairs, by = c("start.station.id", "end.station.id")) %>%
+    select(start.station.id : gender, est.time, est.distance)
+
+  trip.month$birth.year <- as.numeric(trip.month$birth.year)
+  trip.month$tripduration <- as.numeric(trip.month$tripduration)
+  
+  #data frames too difficult to develop with
+  trip.month <- as.data.frame(trip.month)
+  
+  trip.month
 }
 
 processMonthStation <- function(monthFile){
@@ -181,12 +202,23 @@ processMonthStation <- function(monthFile){
       df <- rbind(df, estimates)
   } 
 
-  nc <- cbind(comb, df)
-  names(nc)[9:10] <- c("est.time", "est.distance")
+  distancePairs <- cbind(comb, df)
+  names(distancePairs)[9:10] <- c("est.time", "est.distance")
   
-  saveRDS(nc, file = "data/distancePairs.rds")
+  distancePairs$est.time <- 60 * 
+    as.numeric(sub(" min[s]*", "", distancePairs$est.time))
+  distancePairs$est.distance <- sub(" mi", "", distancePairs$est.distance)
   
-  nc
+  #convert feet to mi
+  rows.ft <- grep("ft", distancePairs$est.distance)
+  distancePairs$est.distance[rows.ft] <- round(
+    as.numeric(sub(" ft", "", distancePairs[rows.ft]$est.distance)) * 0.000189, 
+    2)
+  distancePairs$est.distance <- as.numeric(distancePairs$est.distance)
+  
+  saveRDS(distancePairs, file = "data/distancePairs.rds")
+  
+  distancePairs
 }
 
 #Download trip data from Citi Bikes website. Datasets are available per month,
@@ -206,15 +238,12 @@ dat <- data.table()
 stationCombs <- data.table()
 
 #process the most recent file to get the up-to-date station list
-stationCombs <- processMonthStation(tail(months, 1))
-setkeyv(stationCombs, c("start.station.id", "end.station.id"))
-
-#save locally
-save(stationCombs, file = "data/stationCombs.txt")
+distancePairs <- processMonthStation(tail(months, 1))
+setkeyv(distancePairs, c("start.station.id", "end.station.id"))
 
 #get trip history for all months
 for (m in 1 : (length(months))){
-  dat <- rbind(dat, processMonthTrip(months[m]))
+  dat <- rbind(dat, processMonthTrip(months[m]), distancePairs)
 }
 
 setnames(dat, make.names(names(dat)))

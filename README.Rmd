@@ -34,13 +34,13 @@ University Pl & E 14 St
 ##TODO##
 
 *  Right-type dat columns for space efficiency
-*  Add to trip data speed as a function of distance and duration
+*  Add to trip data **speed** as a function of distance and duration
 *  Aggregate each month's file at a time. Not enough memory to load entire data
 set then aggregate. Average month has ~650K rows. Even grouping by hour and 
 start location would yield 1/3 the rows. Need to reduce at least an order of 
 magnitude. Instead of every hour of the month, maybe:  
-    * break into hour intervals by station (24 * 330 rows/file).  
-    * Or days by station (30 * 330 rows/file).  
+    * ~~break into hour intervals by station (24 * 330 rows/file).~~  
+    * ~~Or days by station (30 * 330 rows/file).~~  
     * By start station and end station combinations (< 330^2) since people will 
   not pick up in BK and return in midtown, for example). This lets us answer
   questions related to neighborhoods/stations
@@ -52,4 +52,4 @@ communication
 *  Calculate standard error of start/end combinations across all the different 
 months. Average ride duration from station A to station B should not change much
 between months and seasons
-
+*  Hist, summary of distance
