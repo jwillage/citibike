@@ -116,6 +116,7 @@ processMonthTrip <- function(monthFile, distancePairs){
     tmp.trip$stoptime <- ymd_hms(tmp$stoptime)
   }
   
+  #todo look into 'truncated' argument
   if (monthFile >= "2014-08-02" & monthFile < "2015-05-31"){ #second format
     #impute months which have missing seconds (oct, dec '14, jan - march '15)
     suppressWarnings(if (is.na(mdy_hms(tmp.trip$starttime))){
@@ -227,16 +228,17 @@ addStations <- function(unknown, distancePairs){
  
   newDp <- cbind(combs, estimates)
   names(newDp)[9:10] <- c("est.time", "est.distance")
-  distancePairs <- rbind(distancePairs, newDp)
-  distancePairs$est.time <- 60 * as.numeric(sub(" min[s]*", "", distancePairs$est.time))
-  distancePairs$est.distance <- sub(" mi", "", distancePairs$est.distance)
+  newDp$est.time <- 60 * as.numeric(sub(" min[s]*", "", newDp$est.time))
+  newDp$est.distance <- sub(" mi", "", newDp$est.distance)
   
   #convert feet to mi
-  rows.ft <- grep("ft", distancePairs$est.distance)
-  distancePairs$est.distance[rows.ft] <- round(
-    as.numeric(sub(" ft", "", distancePairs[rows.ft]$est.distance)) * 0.000189, 
+  rows.ft <- grep("ft", newDp$est.distance)
+  newDp$est.distance[rows.ft] <- round(
+    as.numeric(sub(" ft", "", newDp[rows.ft]$est.distance)) * 0.000189, 
     2)
-  distancePairs$est.distance <- as.numeric(distancePairs$est.distance)
+  newDp$est.distance <- as.numeric(newDp$est.distance)
+  
+  distancePairs <- rbind(distancePairs, newDp)
   
   distancePairs
 }
