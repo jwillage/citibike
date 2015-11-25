@@ -55,3 +55,6 @@ communication
 months. Average ride duration from station A to station B should not change much
 between months and seasons
 *  Hist, summary of distance
+*  Read from zip
+*  Use birth year and gender as partial identifiers
+*  Functionize code for adding new station combinations

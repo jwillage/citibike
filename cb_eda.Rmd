@@ -7,19 +7,23 @@ output:
     keep_md: yes
 ---
 
-```{r, echo = F}
-library(ggplot2)
-library(lubridate)
+```{r setoptions, echo=FALSE, message=FALSE}
 library(dplyr)
+library(lubridate)
+library(ggplot2)
+library(knitr)
+
+opts_chunk$set(echo = TRUE, cache = TRUE, cache.path = "cache/", 
+               fig.path = "figure/", fig.width = 7, fig.height = 7)
 ```
 
 Given a trip month file, explore some of the properties
 ```{r}
-#9/2013
-tmp.trip <- as.data.frame(readRDS("data/Sep13tmptrip.rds"))
+source("cb_analysis.R") 
 distancePairs <- readRDS("data/distancePairs.rds")
-long <- which(tmp.trip$tripduration > 7200)
-table(tmp.trip[long, ]$usertype)
+trip.month <- processMonthTrip("2013-10-01", distancePairs)
+long <- which(trip.month$tripduration > 7200)
+table(trip.month[long, ]$usertype) 
 ```
 
 Surprisingly, we see that subscribers had bikes out for lengthy periods almost 
@@ -29,8 +33,8 @@ need to explore this for a later month file.
 Let's check out the remaining rows.
 
 ```{r}
-tmp.trip.filt <- tmp.trip[tmp.trip$tripduration < 7200, ]
-g <- ggplot(tmp.trip.filt, aes(x = tripduration/60))
+trip.month <- trip.month[trip.month$tripduration < 7200, ]
+g <- ggplot(trip.month, aes(x = tripduration/60))
 g + geom_histogram(binwidth = 2, aes(fill = usertype)) + 
   facet_grid(. ~  usertype) + guides(fill = F)
 ```
@@ -40,20 +44,20 @@ trips than customers, in only the third month of the program. Unfortunately we
 don't have the data to compare unique riders. We can make a general assumption, 
 like subscribers probably bike to work five days a week. Customers, on the other 
 hand, we'll assume only make one round trip (two trips)  in a given month file. There are 
-`r max(day(tmp.trip.filt$starttime))` days in this file, 20 of them are working 
+`r max(day(trip.month$starttime))` days in this file, 20 of them are working 
 days (21 weekdays - 1 Labor Day holiday). So all things being even, we would 
 expect 20 subscriber rides for every 2 customer rides, or 10 : 1. 
 
 ```{r}
-users <- table(tmp.trip.filt$usertype)
+users <- table(trip.month$usertype)
 users["Customer"]
 users["Subscriber"]/10
 ```
 
 Although it appears from the histogram that there are many more subscribers than 
 customers, under these assumptions, we see that
-`r round(users["Customer"]/(users["Subscriber"]/10 + users["Customer"]) * 100, 2)`
-% of this month's unique riders are customers. Since the types of users are not 
+`r round(users["Customer"]/(users["Subscriber"]/10 + users["Customer"]) * 100, 2)`%
+of this month's unique riders are customers. Since the types of users are not 
 too different, we'll scale each plot's y-axis accordingly. We will split the 
 plots on two rows, instead of the same row, to further emphasize the difference 
 in scale. 
@@ -63,7 +67,7 @@ seemingly blank space on the right hand side. We filtered on trips less than 120
 minutes, but there are still trips that take much longer than the median. 
 
 ```{r}
-g <- ggplot(subset(tmp.trip.filt, tripduration > 1800),
+g <- ggplot(subset(trip.month, tripduration > 1800),
             aes(x = tripduration/60))
 g + geom_histogram(binwidth = 2, aes(fill = usertype)) + 
   facet_wrap(~  usertype, scales = "free_y", nrow = 2) + guides(fill = F)
@@ -73,7 +77,7 @@ There are still thousands of trips in this tail that we don't want to ignore.
 Let's see how the log-transformed histogram of the original filtered data looks.
 
 ```{r}
-g <- ggplot(tmp.trip.filt, aes(x = log(tripduration/60)))
+g <- ggplot(trip.month, aes(x = log(tripduration/60)))
 g + geom_histogram(aes(fill = usertype)) + 
   facet_wrap(~  usertype, scales = "free_y", nrow = 2) + guides(fill = F)
 ```
@@ -81,9 +85,9 @@ g + geom_histogram(aes(fill = usertype)) +
 Pretty normal. We'll keep this in our back pocket in case it's needed later.
 
 ```{r}
-subs <- tmp.trip.filt$usertype == "Subscriber"
-upper.bound.subs <- quantile(tmp.trip.filt[subs, "tripduration"], .95)
-upper.bound.cust <- quantile(tmp.trip.filt[-subs, "tripduration"], .95)
+subs <- trip.month$usertype == "Subscriber"
+upper.bound.subs <- quantile(trip.month[subs, "tripduration"], .95)
+upper.bound.cust <- quantile(trip.month[-subs, "tripduration"], .95)
 
 ```
 
@@ -92,14 +96,15 @@ than minutes. Binwidths are 30 second intervals, giving us a pretty smooth
 curve. 
 
 ```{r}
-tmp.trip.filt <- tmp.trip.filt %>% 
+trip.month <- trip.month %>% 
   mutate(inbounds = ifelse(usertype == "Customer", 
                            tripduration < upper.bound.cust , 
                            tripduration < upper.bound.subs)) %>%
   filter(inbounds == TRUE)
 
+subs <- trip.month$usertype == "Subscriber"
 
-g <- ggplot(tmp.trip.filt, aes(x =tripduration))
+g <- ggplot(trip.month, aes(x =tripduration))
 g + geom_histogram(binwidth = 30, aes(fill = usertype)) + 
   facet_wrap(~  usertype, scales = "free_y", nrow = 2) + guides(fill = F)
 ```
@@ -107,48 +112,136 @@ g + geom_histogram(binwidth = 30, aes(fill = usertype)) +
 Now that we've got a data set that makes sense, let's dig in further. 
 
 ```{r}
-g <- ggplot(tmp.trip.filt, aes(y =tripduration/60, x = usertype))
+g <- ggplot(trip.month, aes(y =tripduration/60, x = usertype))
 g + geom_boxplot(aes(fill = usertype)) + guides(fill = F)
 ```
 
-Subscribers ride for lesser time than customers.Makes sense. They'll typically 
-know where they're going and the fastest route to get there (assuming this is a
-commute). 
-
-Let's finally look at the trip distance estimates.
+Almost identical boxplots for both user types. 
 
 ```{r}
- trip.month <- tmp.trip %>% 
-    left_join(distancePairs, by = c("start.station.id", "end.station.id")) 
-#  %>%    select(start.station.id : gender, est.time, est.distance)
+rbind(summary(trip.month[subs, "tripduration"]), 
+      summary(trip.month[-subs, "tripduration"]))
+```
 
-  trip.month$birth.year <- as.numeric(trip.month$birth.year)
-  trip.month$tripduration <- as.numeric(trip.month$tripduration)
-  
+Nary a difference. Let's finally look at the trip distance estimates.
+
+```{r}
 g <- ggplot(trip.month, aes(y = est.distance, x = usertype))
 g + geom_boxplot(aes(fill = usertype)) + guides(fill = F)
 ```
 
-Here we see subscribers are traveling shorter (estimated) distances, but it 
-doesn't appear equal to the proportion of duration between user types. We'll 
-perform a t-test and see if we can say that subscribers in fact ride for 
-shorter distances. 
+Here again we can see there's barely a difference between user types. 
+
+Let's shift focus and explore a more recent month. 
+(In March 2014, new stations were added: 491, 530). 
 
 ```{r}
-s <- trip.month[subs, "est.distance"]
-c <- trip.month[-subs, "est.distance"]
-print(t <- t.test(s, c, var.equal = FALSE))
+monthFile <- "2014-03-01" 
+rec.trip.month <- processMonthTrip(monthFile, distancePairs)
+summary(rec.trip.month)
+
+all.stations <- unique(c(rec.trip.month$start.station.id, rec.trip.month$end.station.id))
+unknown.indices <- which(!all.stations %in% distancePairs$start.station.id)
+print(unknown <- all.stations[unknown.indices])
 ```
 
-The difference in means is only thousandths of a mile. The p-value of 
-`r #round(t$p.value, 2)` is much higher than the 5% value with which we could 
-confidently say there is a difference in means. To be sure, we'll perform a 
-similar test comparing the average trip durations.
+Note the NA's. We're missing some stations in our distancePairs list. 
+```{r eval = FALSE}
+#calculate distance matrix for these missing values and append to distance.pairs
+
+#need to put this in it's own function for anytime we want to add more station combinations
+tmp <- getMonthData(monthFile)
+start <- tmp[, 4:7, with = FALSE]
+end <- tmp[, 8:11, with = FALSE]; names(end) <- names(start)
+tmp.station <-  rbind(start, end)
+unknown.full <- unique(tmp.station[tmp.station$`start station id` %in% unknown, ])
+existing.full <- unique(distancePairs[, 1:4, with = FALSE])
+
+startCombs <- as.data.table(levels(interaction(paste(unknown.full$'start station id', 
+                               unknown.full$'start station name',
+                               unknown.full$'start station latitude', 
+                               unknown.full$'start station longitude',
+                               sep = ";"),
+            paste(existing.full$start.station.id,
+                  existing.full$start.station.name,
+                  existing.full$start.station.latitude,
+                  existing.full$start.station.longitude,
+                  sep = ";")
+            , sep = ";"
+            )))
+endCombs <- as.data.table(levels(interaction(            
+                paste(existing.full$start.station.id,
+                  existing.full$start.station.name,
+                  existing.full$start.station.latitude,
+                  existing.full$start.station.longitude,
+                  sep = ";"),
+                  paste(unknown.full$'start station id', 
+                               unknown.full$'start station name',
+                               unknown.full$'start station latitude', 
+                               unknown.full$'start station longitude',
+                               sep = ";"),
+                sep = ";"
+            )))
+# interaction between new station and new station
+newCombs <- as.data.table(levels(interaction(paste(unknown.full$'start station id', 
+                               unknown.full$'start station name',
+                               unknown.full$'start station latitude', 
+                               unknown.full$'start station longitude',
+                               sep = ";"),
+                               paste(unknown.full$'start station id', 
+                               unknown.full$'start station name',
+                               unknown.full$'start station latitude', 
+                               unknown.full$'start station longitude',
+                               sep = ";"), sep = ";")))
+
+combs <- rbind(startCombs, endCombs, newCombs)
+combs <- separate(combs, V1, c(names(tmp.station), 
+                               sub('start', 'end', names(tmp.station))), 
+                   sep = ";")
+setnames(combs, make.names(names(combs)))
+
+#now make the call to google api to get estimates
+stationDistanceMatrix <- Vectorize(stationDistanceMatrix)
+estimates <- t(with(combs, stationDistanceMatrix(start.station.latitude,
+                                               start.station.longitude,
+                                               end.station.latitude, 
+                                               end.station.longitude)))
+newDp <- cbind(combs, estimates)
+names(newDp)[9:10] <- c("est.time", "est.distance")
+distancePairs <- rbind(distancePairs, newDp)
+distancePairs$est.time <- 60 * 
+  as.numeric(sub(" min[s]*", "", distancePairs$est.time))
+distancePairs$est.distance <- sub(" mi", "", distancePairs$est.distance)
+
+#convert feet to mi
+rows.ft <- grep("ft", distancePairs$est.distance)
+distancePairs$est.distance[rows.ft] <- round(
+  as.numeric(sub(" ft", "", distancePairs[rows.ft]$est.distance)) * 0.000189, 
+  2)
+distancePairs$est.distance <- as.numeric(distancePairs$est.distance)
+saveRDS(distancePairs, file = "data/distancePairs.rds")
+```
+
+```{r, eval = F}
+monthFile <- "2015-05-01"
+rec.trip.month <- processMonthTrip(monthFile, distancePairs)
+summary (rec.trip.month) 
+
+unknown <- findUnknownStations(monthFile, rec.trip.month, distancePairs)
+newDP <- addStations(unknown, distancePairs)
+```
+
+
+Let's remove the person who had their bike out for over two weeks, and any other 
+suspiciously long trips. 
 
 ```{r}
-s <- tmp.trip.filt[subs, "tripduration"]
-c <- trip.month[-subs, "tripduration"]
-print(t <- t.test(c, s, var.equal = FALSE))
+tail(rec.trip.month[order(rec.trip.month$tripduration),]$tripduration, 100)
 ```
 
-check if tmp.trip.filt  matching up with trip.month and not matching up w boxplots
+The 100th longest trip isn't nearly as bad as the longest, about 16 hours vs 2 
+weeks. Instead of using the 95th percentile as a cutoff point, let's see what we 
+get at the 99th. It's `r quantile(rec.trip.month[, "tripduration"], .99)/60` 
+minutes. I like that better than 95%; Not only does it give us more data, it 
+brings us out of 33 minute upper bound and into the 50's, which isn't 
+unreasonable since subscribers are alloted 45 minutes. 

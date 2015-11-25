@@ -51,7 +51,7 @@ stationDistanceMatrix <- function(startLat, startLon, endLat, endLon){
   url <- "https://maps.googleapis.com/maps/api/distancematrix/xml?mode=bicycling&units=imperial"
   
   #key is optional for this api call
-  url <- paste0(url, "&key=", readLines("privatekey.txt"))
+  #url <- paste0(url, "&key=", readLines("privatekey.txt"))
   url <- paste0(url, "&origins=", startLat, ",", startLon, 
                 " &destinations=", endLat, ",", endLon)
 
@@ -117,6 +117,10 @@ processMonthTrip <- function(monthFile, distancePairs){
   }
   
   if (monthFile >= "2014-08-02" & monthFile < "2015-05-31"){ #second format
+    #impute months which have missing seconds (oct, dec '14, jan - march '15)
+    suppressWarnings(if (is.na(mdy_hms(tmp.trip$starttime))){
+      tmp.trip$starttime <- paste0(tmp.trip$starttime, ":00")
+    })
     tmp.trip$starttime <- mdy_hms(tmp$starttime)
     tmp.trip$stoptime <- mdy_hms(tmp$stoptime)
   }
@@ -145,7 +149,6 @@ processMonthTrip <- function(monthFile, distancePairs){
   trip.month$tripduration <- as.numeric(trip.month$tripduration)
   trip.month$usertype <- as.factor(tmp.trip$usertype)
   
-  #saveRDS(trip.month, "data/Sep13tmptrip.rds")  
   trip.month
 }
 
@@ -155,20 +158,8 @@ processMonthStation <- function(monthFile){
   #Split into stations
   tmp.station <- tmp[, c(4, 5, 6, 7), with = FALSE]
 
-  #calculate all combinations of stations and the distance between them,
-  #in order to map them back to each rider
-  comb <- as.data.table(levels(
-             interaction(paste(tmp.station$'start station id', 
-                               tmp.station$'start station name',
-                               tmp.station$'start station latitude', 
-                               tmp.station$'start station longitude',
-                               sep = ";"), 
-                         paste(tmp.station$'start station id', 
-                               tmp.station$'start station name',
-                               tmp.station$'start station latitude', 
-                               tmp.station$'start station longitude',
-                               sep = ";")
-                         , sep = ";")))
+  #calculate all combinations of stations and the distance between them
+  comb <- createCombs(as.data.frame(tmp.station), as.data.frame(tmp.station))
   
   comb <- separate(comb, V1, c(names(tmp.station), 
                                sub('start', 'end', names(tmp.station))), 
@@ -211,6 +202,59 @@ processMonthStation <- function(monthFile){
   distancePairs
 }
 
+createCombs <- function(x, y){
+  as.data.table(levels(interaction(
+                                paste(x[,1], x[,2], x[,3], x[,4], sep = ";"),
+                                paste(y[,1], y[,2], y[,3], y[,4], sep = ";"),
+                                sep = ";") ) )
+}
+
+addStations <- function(unknown, distancePairs){
+  known <- as.data.frame(unique(distancePairs[, 1:4, with = FALSE]))
+  startCombs <- createCombs(unknown, known)
+  endCombs <- createCombs(known, unknown)
+  newCombs <- createCombs(unknown, unknown)
+  
+  combs <- rbind(startCombs, endCombs, newCombs)
+  combs <- separate(combs, V1, names(distancePairs)[1:8], sep = ";")
+  setnames(combs, make.names(names(combs)))
+  
+  stationDistanceMatrix <- Vectorize(stationDistanceMatrix) 
+  estimates <- t(with(comb, stationDistanceMatrix(start.station.latitude,
+                               start.station.longitude,
+                               end.station.latitude, 
+                               end.station.longitude)))
+ 
+  newDp <- cbind(combs, estimates)
+  names(newDp)[9:10] <- c("est.time", "est.distance")
+  distancePairs <- rbind(distancePairs, newDp)
+  distancePairs$est.time <- 60 * as.numeric(sub(" min[s]*", "", distancePairs$est.time))
+  distancePairs$est.distance <- sub(" mi", "", distancePairs$est.distance)
+  
+  #convert feet to mi
+  rows.ft <- grep("ft", distancePairs$est.distance)
+  distancePairs$est.distance[rows.ft] <- round(
+    as.numeric(sub(" ft", "", distancePairs[rows.ft]$est.distance)) * 0.000189, 
+    2)
+  distancePairs$est.distance <- as.numeric(distancePairs$est.distance)
+  
+  distancePairs
+}
+
+findUnknownStations <- function(monthFile, monthTrip, distancePairs){
+  all.stations <- unique(c(monthTrip$start.station.id, monthTrip$end.station.id))
+  unknown.indices <- which(!all.stations %in% distancePairs$start.station.id)
+  unknown <- all.stations[unknown.indices]
+  
+  tmp <- getMonthData(monthFile)
+  start <- tmp[, 4:7, with = FALSE]
+  end <- tmp[, 8:11, with = FALSE]; names(end) <- names(start)
+  tmp.station <-  rbind(start, end)
+  unknown.full <- unique(tmp.station[tmp.station$`start station id` %in% unknown, ])
+  
+  data.frame(unknown.full)
+}
+
 #Download trip data from Citi Bikes website. Datasets are available per month,
 #begining July 2013, when the service launched.
 startMonth <- "07"
@@ -224,7 +268,6 @@ end <- ymd(paste(endYear, endMonth, "01"))
 
 months <- seq(start, end, by = "1 month")
 
-dat <- data.table()
 stationCombs <- data.table()
 
 #process the most recent file to get the up-to-date station list
@@ -237,8 +280,6 @@ stationCombs <- data.table()
  #}
 
  #setnames(dat, make.names(names(dat)))
-
- #dat$birth.year <- as.numeric(dat$birth.year)
 
 #average duration by customer type. Divide by 60 to convert to minutes
  #dat[, mean(tripduration/60, na.rm = T), by = usertype]
