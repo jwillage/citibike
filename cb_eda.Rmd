@@ -222,26 +222,72 @@ distancePairs$est.distance <- as.numeric(distancePairs$est.distance)
 saveRDS(distancePairs, file = "data/distancePairs.rds")
 ```
 
-```{r, eval = F}
+
+```{r}
 monthFile <- "2015-05-01"
 rec.trip.month <- processMonthTrip(monthFile, distancePairs)
 summary (rec.trip.month) 
-
-unknown <- findUnknownStations(monthFile, rec.trip.month, distancePairs)
-newDP <- addStations(unknown, distancePairs)
 ```
 
 
-Let's remove the person who had their bike out for over two weeks, and any other 
+New station 255 introduced 3/15. 7/15 introduced 3180. In 8/15, 90 new stations were introduced. 
+Including a temporary ["ET Bike-In Movie Valet Station."](http://citibikeblog.tumblr.com/post/127176036862/et-the-extra-terrestrial-bike-in-movie)
+```{r, eval = F}
+unknown <- findUnknownStations(monthFile, rec.trip.month, distancePairs)
+newDP <- addStations(unknown, distancePairs)
+distancePairs.old <- distancePairs #keep the old one for backup
+distancePairs <- newDP
+```
+
+Let's remove the person who had their bike out for over four weeks, and any other 
 suspiciously long trips. 
 
 ```{r}
 tail(rec.trip.month[order(rec.trip.month$tripduration),]$tripduration, 100)
 ```
 
-The 100th longest trip isn't nearly as bad as the longest, about 16 hours vs 2 
-weeks. Instead of using the 95th percentile as a cutoff point, let's see what we 
-get at the 99th. It's `r quantile(rec.trip.month[, "tripduration"], .99)/60` 
-minutes. I like that better than 95%; Not only does it give us more data, it 
-brings us out of 33 minute upper bound and into the 50's, which isn't 
-unreasonable since subscribers are alloted 45 minutes. 
+Even the 100th longest trip of this month is close to 2 days. Instead of using the 95th percentile as a cutoff point, let's see what we get at the 99th. It's 
+`r quantile(rec.trip.month[, "tripduration"], .99)/60` minutes. I like that better than 95%; Not
+only does it give us more data, it brings us out of 30-odd minute upper bound and into the 70's,
+which isn't unreasonable since subscribers are alloted 45 minutes. An interesting note is that if we
+did take the 95th percentile, that value for this month is 
+`r quantile(rec.trip.month[, "tripduration"], .95)/60` minutes, which is actually longer than it was
+in the early months of the program. 
+
+Let's see how the average trip length has changed throughout the course of the program. Here, we'll
+take each month's data up to the 99th percentile. 
+
+```{r}
+start <- ymd("2013-07-01"); end <- ymd("2015-10-01")
+months <- as.character(seq(start, end, by = "1 month"))
+avgs.mat <- NULL
+for (m in 1:length(months)){
+  t <- processMonthTrip(months[m], distancePairs)
+  #take up to the 99th quantile
+  upper <- quantile(t$tripduration, .99)
+  t <- subset(t, tripduration < upper)
+  avgs.mat <- rbind(avgs.mat, cbind(mean(t$tripduration), mean(t$birth.year, na.rm = TRUE), 
+                            mean(subset(t, gender != 0)$gender), mean(t$est.time),
+                            mean(t$est.distance)))
+
+}
+avgs <- data.frame(as.Date(months), avgs.mat)
+names(avgs) <- c("month", "mean.duration", "mean.birth", "mean.gender", "mean.est.time", 
+                 "mean.est.dist")
+avgs
+```
+
+We're still missing values for the stations added in August 2015. Working from the opening of 
+CitiBikes to July 2015 gives us 25 months of full data, and we'll download the data for the new 
+stations later on. 
+
+```{r}
+avgs <- avgs[complete.cases(avgs),]
+g <- ggplot(avgs, aes(x = month, y = mean.duration))
+g + geom_point(size = 6, color = "black") + geom_point(size = 5, color = "dodgerblue1") +
+  geom_smooth(method = "lm", formula  = y~ns(x,df =5), se = FALSE, color = "black")
+```
+
+So there is a huge seasonal effect on ride duration, as might be expected. But setting that aside, 
+it doesn't appear that the duration has changed much year over year (with only 2 years of data to 
+look at). 

@@ -122,8 +122,12 @@ processMonthTrip <- function(monthFile, distancePairs){
     suppressWarnings(if (is.na(mdy_hms(tmp.trip$starttime))){
       tmp.trip$starttime <- paste0(tmp.trip$starttime, ":00")
     })
-    tmp.trip$starttime <- mdy_hms(tmp$starttime)
-    tmp.trip$stoptime <- mdy_hms(tmp$stoptime)
+    suppressWarnings(if (is.na(mdy_hms(tmp.trip$stoptime))){
+      tmp.trip$stoptime <- paste0(tmp.trip$stoptime, ":00")
+    })
+    
+    tmp.trip$starttime <- mdy_hms(tmp.trip$starttime)
+    tmp.trip$stoptime <- mdy_hms(tmp.trip$stoptime)
   }
   
   #june file does not have seconds, remove 's' from function and run
@@ -139,6 +143,8 @@ processMonthTrip <- function(monthFile, distancePairs){
   #remove trips that were longer than 2 hours
   
   #join with estimates and process at the trip level, then aggregate
+  tmp.trip$start.station.id <- as.character(tmp.trip$start.station.id)
+  tmp.trip$end.station.id <- as.character(tmp.trip$end.station.id)
   trip.month <- tmp.trip %>% 
     left_join(distancePairs, by = c("start.station.id", "end.station.id")) %>%
     select(start.station.id : gender, est.time, est.distance)
@@ -149,6 +155,7 @@ processMonthTrip <- function(monthFile, distancePairs){
   trip.month$birth.year <- as.numeric(trip.month$birth.year)
   trip.month$tripduration <- as.numeric(trip.month$tripduration)
   trip.month$usertype <- as.factor(tmp.trip$usertype)
+  trip.month$gender <- as.numeric(trip.month$gender)
   
   trip.month
 }
@@ -221,7 +228,7 @@ addStations <- function(unknown, distancePairs){
   setnames(combs, make.names(names(combs)))
   
   stationDistanceMatrix <- Vectorize(stationDistanceMatrix) 
-  estimates <- t(with(comb, stationDistanceMatrix(start.station.latitude,
+  estimates <- t(with(combs, stationDistanceMatrix(start.station.latitude,
                                start.station.longitude,
                                end.station.latitude, 
                                end.station.longitude)))

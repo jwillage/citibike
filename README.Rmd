@@ -57,4 +57,5 @@ between months and seasons
 *  Hist, summary of distance
 *  Read from zip
 *  Use birth year and gender as partial identifiers
-*  Functionize code for adding new station combinations
+*  ~~Functionize code for adding new station combinations~~
+*  Download distance data for 90 stations added Aug '15.
