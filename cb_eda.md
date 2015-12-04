@@ -8,48 +8,16 @@ Given a trip month file, explore some of the properties
 
 ```r
 source("cb_analysis.R") 
-```
-
-```
-## Loading required package: bitops
-## 
-## Attaching package: 'data.table'
-## 
-## The following objects are masked from 'package:lubridate':
-## 
-##     hour, mday, month, quarter, wday, week, yday, year
-## 
-## The following objects are masked from 'package:dplyr':
-## 
-##     between, last
-## 
-## 
-## Attaching package: 'jsonlite'
-## 
-## The following object is masked from 'package:utils':
-## 
-##     View
-## 
-## 
-## Attaching package: 'tidyr'
-## 
-## The following object is masked from 'package:RCurl':
-## 
-##     complete
-```
-
-```r
-distancePairs <- readRDS("data/distancePairs.rds")
+distancePairs <- readRDS("data/distancePairs.rds") 
 trip.month <- processMonthTrip("2013-10-01", distancePairs)
 ```
 
 ```
 ## 
-Read 31.8% of 1037712 rows
-Read 53.0% of 1037712 rows
-Read 69.4% of 1037712 rows
+Read 36.6% of 1037712 rows
+Read 59.7% of 1037712 rows
 Read 85.8% of 1037712 rows
-Read 1037712 rows and 15 (of 15) columns from 0.189 GB file in 00:00:06
+Read 1037712 rows and 15 (of 15) columns from 0.189 GB file in 00:00:05
 ```
 
 ```r
@@ -214,151 +182,143 @@ g + geom_boxplot(aes(fill = usertype)) + guides(fill = F)
 Here again we can see there's barely a difference between user types. 
 
 Let's shift focus and explore a more recent month. 
-(In March 2014, new stations were added: 491, 530). 
+ 
 
 
-```r
-monthFile <- "2014-03-01" 
-rec.trip.month <- processMonthTrip(monthFile, distancePairs)
-summary(rec.trip.month)
-```
 
-```
-##  start.station.id   end.station.id      tripduration    
-##  Length:439117      Length:439117      Min.   :   60.0  
-##  Class :character   Class :character   1st Qu.:  349.0  
-##  Mode  :character   Mode  :character   Median :  536.0  
-##                                        Mean   :  715.6  
-##                                        3rd Qu.:  852.0  
-##                                        Max.   :21454.0  
-##                                                         
-##    starttime                      stoptime                  
-##  Min.   :2014-03-01 00:00:16   Min.   :2014-03-01 00:03:08  
-##  1st Qu.:2014-03-10 12:33:37   1st Qu.:2014-03-10 12:43:49  
-##  Median :2014-03-17 11:03:56   Median :2014-03-17 11:16:50  
-##  Mean   :2014-03-17 03:16:52   Mean   :2014-03-17 03:28:48  
-##  3rd Qu.:2014-03-23 19:53:39   3rd Qu.:2014-03-23 20:03:45  
-##  Max.   :2014-03-31 23:59:54   Max.   :2014-04-01 00:16:56  
-##                                                             
-##     bikeid                usertype        birth.year       gender         
-##  Length:439117      Customer  : 22882   Min.   :1899    Length:439117     
-##  Class :character   Subscriber:416235   1st Qu.:1967    Class :character  
-##  Mode  :character                       Median :1977    Mode  :character  
-##                                         Mean   :1975                      
-##                                         3rd Qu.:1984                      
-##                                         Max.   :1998                      
-##                                         NA's   :22882                     
-##     est.time         est.distance  
-##  Min.   :      60   Min.   :0.000  
-##  1st Qu.: 1080000   1st Qu.:0.700  
-##  Median : 1728000   Median :1.100  
-##  Mean   : 1927182   Mean   :1.377  
-##  3rd Qu.: 2376000   3rd Qu.:1.700  
-##  Max.   :11664000   Max.   :9.600  
-## 
-```
 
-```r
-all.stations <- unique(c(rec.trip.month$start.station.id, rec.trip.month$end.station.id))
-unknown.indices <- which(!all.stations %in% distancePairs$start.station.id)
-print(unknown <- all.stations[unknown.indices])
-```
 
-```
-## character(0)
-```
-
-Note the NA's. We're missing some stations in our distancePairs list. 
-
-```r
-#calculate distance matrix for these missing values and append to distance.pairs
-
-#need to put this in it's own function for anytime we want to add more station combinations
-tmp <- getMonthData(monthFile)
-start <- tmp[, 4:7, with = FALSE]
-end <- tmp[, 8:11, with = FALSE]; names(end) <- names(start)
-tmp.station <-  rbind(start, end)
-unknown.full <- unique(tmp.station[tmp.station$`start station id` %in% unknown, ])
-existing.full <- unique(distancePairs[, 1:4, with = FALSE])
-
-startCombs <- as.data.table(levels(interaction(paste(unknown.full$'start station id', 
-                               unknown.full$'start station name',
-                               unknown.full$'start station latitude', 
-                               unknown.full$'start station longitude',
-                               sep = ";"),
-            paste(existing.full$start.station.id,
-                  existing.full$start.station.name,
-                  existing.full$start.station.latitude,
-                  existing.full$start.station.longitude,
-                  sep = ";")
-            , sep = ";"
-            )))
-endCombs <- as.data.table(levels(interaction(            
-                paste(existing.full$start.station.id,
-                  existing.full$start.station.name,
-                  existing.full$start.station.latitude,
-                  existing.full$start.station.longitude,
-                  sep = ";"),
-                  paste(unknown.full$'start station id', 
-                               unknown.full$'start station name',
-                               unknown.full$'start station latitude', 
-                               unknown.full$'start station longitude',
-                               sep = ";"),
-                sep = ";"
-            )))
-# interaction between new station and new station
-newCombs <- as.data.table(levels(interaction(paste(unknown.full$'start station id', 
-                               unknown.full$'start station name',
-                               unknown.full$'start station latitude', 
-                               unknown.full$'start station longitude',
-                               sep = ";"),
-                               paste(unknown.full$'start station id', 
-                               unknown.full$'start station name',
-                               unknown.full$'start station latitude', 
-                               unknown.full$'start station longitude',
-                               sep = ";"), sep = ";")))
-
-combs <- rbind(startCombs, endCombs, newCombs)
-combs <- separate(combs, V1, c(names(tmp.station), 
-                               sub('start', 'end', names(tmp.station))), 
-                   sep = ";")
-setnames(combs, make.names(names(combs)))
-
-#now make the call to google api to get estimates
-stationDistanceMatrix <- Vectorize(stationDistanceMatrix)
-estimates <- t(with(combs, stationDistanceMatrix(start.station.latitude,
-                                               start.station.longitude,
-                                               end.station.latitude, 
-                                               end.station.longitude)))
-newDp <- cbind(combs, estimates)
-names(newDp)[9:10] <- c("est.time", "est.distance")
-distancePairs <- rbind(distancePairs, newDp)
-distancePairs$est.time <- 60 * 
-  as.numeric(sub(" min[s]*", "", distancePairs$est.time))
-distancePairs$est.distance <- sub(" mi", "", distancePairs$est.distance)
-
-#convert feet to mi
-rows.ft <- grep("ft", distancePairs$est.distance)
-distancePairs$est.distance[rows.ft] <- round(
-  as.numeric(sub(" ft", "", distancePairs[rows.ft]$est.distance)) * 0.000189, 
-  2)
-distancePairs$est.distance <- as.numeric(distancePairs$est.distance)
-saveRDS(distancePairs, file = "data/distancePairs.rds")
-```
 
 
 ```r
 monthFile <- "2015-05-01"
 rec.trip.month <- processMonthTrip(monthFile, distancePairs)
-summary (rec.trip.month) 
-
-unknown <- findUnknownStations(monthFile, rec.trip.month, distancePairs)
-newDP <- addStations(unknown, distancePairs)
 ```
 
+```
+## 
+Read 32.2% of 961986 rows
+Read 41.6% of 961986 rows
+Read 53.0% of 961986 rows
+Read 61.3% of 961986 rows
+Read 76.9% of 961986 rows
+Read 90.4% of 961986 rows
+Read 961986 rows and 15 (of 15) columns from 0.173 GB file in 00:00:08
+```
 
-Let's remove the person who had their bike out for over two weeks, and any other 
-suspiciously long trips. 
+```r
+summary (rec.trip.month) 
+```
+
+```
+##  start.station.id   end.station.id      tripduration    
+##  Length:961986      Length:961986      Min.   :     60  
+##  Class :character   Class :character   1st Qu.:    413  
+##  Mode  :character   Mode  :character   Median :    675  
+##                                        Mean   :   1000  
+##                                        3rd Qu.:   1131  
+##                                        Max.   :2937702  
+##                                                         
+##    starttime                      stoptime                  
+##  Min.   :2015-05-01 00:00:11   Min.   :2015-05-01 00:03:40  
+##  1st Qu.:2015-05-08 19:03:12   1st Qu.:2015-05-08 19:19:09  
+##  Median :2015-05-16 12:39:25   Median :2015-05-16 12:57:27  
+##  Mean   :2015-05-16 15:49:28   Mean   :2015-05-16 16:06:08  
+##  3rd Qu.:2015-05-24 12:38:19   3rd Qu.:2015-05-24 13:01:24  
+##  Max.   :2015-05-31 23:59:59   Max.   :2015-06-16 18:28:43  
+##                                                             
+##     bikeid                usertype        birth.year    
+##  Length:961986      Customer  :167544   Min.   :1885    
+##  Class :character   Subscriber:794442   1st Qu.:1968    
+##  Mode  :character                       Median :1979    
+##                                         Mean   :1976    
+##                                         3rd Qu.:1985    
+##                                         Max.   :1999    
+##                                         NA's   :167552  
+##     gender             est.time         est.distance  
+##  Length:961986      Min.   :      60   Min.   :0.000  
+##  Class :character   1st Qu.: 1080000   1st Qu.:0.800  
+##  Mode  :character   Median : 1728000   Median :1.200  
+##                     Mean   : 2066278   Mean   :1.511  
+##                     3rd Qu.: 2808000   3rd Qu.:2.000  
+##                     Max.   :11232000   Max.   :9.300  
+##                     NA's   :17         NA's   :17
+```
+
+We can add new stations to remove the NA's
+
+
+```r
+unknown <- findUnknownStations(monthFile, rec.trip.month, distancePairs)
+newDP <- addStations(unknown, distancePairs)
+distancePairs.old <- distancePairs #keep the old one for backup
+distancePairs <- newDP
+```
+
+Station additions:
+
+*  March 2014 added 491, 530  
+*  March 2015 added 255  
+*  July 2015 added 3180  
+*  August 2015, 90 new stations were introduced. Including a temporary [ET Bike-In Movie Valet Station.](http://citibikeblog.tumblr.com/post/127176036862/et-the-extra-terrestrial-bike-in-movie)
+
+
+
+```r
+rec.trip.month <- processMonthTrip(monthFile, distancePairs)
+```
+
+```
+## 
+Read 28.1% of 961986 rows
+Read 38.5% of 961986 rows
+Read 52.0% of 961986 rows
+Read 61.3% of 961986 rows
+Read 76.9% of 961986 rows
+Read 90.4% of 961986 rows
+Read 961986 rows and 15 (of 15) columns from 0.173 GB file in 00:00:09
+```
+
+```r
+summary (rec.trip.month) 
+```
+
+```
+##  start.station.id   end.station.id      tripduration    
+##  Length:961986      Length:961986      Min.   :     60  
+##  Class :character   Class :character   1st Qu.:    413  
+##  Mode  :character   Mode  :character   Median :    675  
+##                                        Mean   :   1000  
+##                                        3rd Qu.:   1131  
+##                                        Max.   :2937702  
+##                                                         
+##    starttime                      stoptime                  
+##  Min.   :2015-05-01 00:00:11   Min.   :2015-05-01 00:03:40  
+##  1st Qu.:2015-05-08 19:03:12   1st Qu.:2015-05-08 19:19:09  
+##  Median :2015-05-16 12:39:25   Median :2015-05-16 12:57:27  
+##  Mean   :2015-05-16 15:49:28   Mean   :2015-05-16 16:06:08  
+##  3rd Qu.:2015-05-24 12:38:19   3rd Qu.:2015-05-24 13:01:24  
+##  Max.   :2015-05-31 23:59:59   Max.   :2015-06-16 18:28:43  
+##                                                             
+##     bikeid                usertype        birth.year         gender     
+##  Length:961986      Customer  :167544   Min.   :1885     Min.   :0.000  
+##  Class :character   Subscriber:794442   1st Qu.:1968     1st Qu.:1.000  
+##  Mode  :character                       Median :1979     Median :1.000  
+##                                         Mean   :1976     Mean   :1.019  
+##                                         3rd Qu.:1985     3rd Qu.:1.000  
+##                                         Max.   :1999     Max.   :2.000  
+##                                         NA's   :167552                  
+##     est.time         est.distance   
+##  Min.   :   1.000   Min.   : 0.000  
+##  1st Qu.:   5.000   1st Qu.: 0.800  
+##  Median :   8.000   Median : 1.200  
+##  Mean   :   9.773   Mean   : 1.511  
+##  3rd Qu.:  13.000   3rd Qu.: 2.000  
+##  Max.   :3300.000   Max.   :10.500  
+##  NA's   :1
+```
+
+Let's remove the person who had their bike out for 34 days, and any other suspiciously long trips. 
 
 
 ```r
@@ -366,21 +326,149 @@ tail(rec.trip.month[order(rec.trip.month$tripduration),]$tripduration, 100)
 ```
 
 ```
-##   [1] 17142 17157 17235 17242 17272 17315 17336 17347 17386 17393 17494
-##  [12] 17602 17622 17622 17628 17648 17653 17738 17766 17774 17778 17782
-##  [23] 17790 17858 17962 17963 17993 18004 18140 18160 18239 18399 18473
-##  [34] 18500 18535 18575 18786 18797 18822 18829 18830 18848 18870 18955
-##  [45] 19009 19081 19163 19179 19196 19272 19289 19319 19346 19398 19433
-##  [56] 19453 19469 19572 19606 19630 19640 19655 19759 19788 19874 19890
-##  [67] 19892 19935 19966 20089 20128 20218 20244 20283 20388 20427 20521
-##  [78] 20530 20546 20596 20649 20855 20879 20886 21147 21168 21178 21180
-##  [89] 21194 21227 21254 21270 21320 21330 21332 21359 21387 21433 21437
-## [100] 21454
+##   [1]  159981  160352  160866  162182  164725  166151  166507  166511
+##   [9]  167333  168118  168408  171624  171912  172065  172842  174256
+##  [17]  174614  177211  179104  179632  180571  180665  182297  185188
+##  [25]  185749  186103  188801  195277  197130  199467  199988  207266
+##  [33]  209187  211507  214950  219650  220854  226232  226429  232199
+##  [41]  232836  233028  241778  244519  250483  252507  257356  261243
+##  [49]  261420  265158  265550  275128  275839  276043  276605  281049
+##  [57]  303129  308198  312557  314793  332671  341082  341271  351150
+##  [65]  351740  363048  365349  387883  391375  395092  404903  408733
+##  [73]  419582  434762  445715  460039  467929  553644  570603  594017
+##  [81]  610007  774243  777341  778894  793767  839985  846666  919930
+##  [89]  929820  937482 1037885 1098333 1101269 1190825 1196056 1483307
+##  [97] 1535944 1544503 2485503 2937702
 ```
 
-The 100th longest trip isn't nearly as bad as the longest, about 16 hours vs 2 
-weeks. Instead of using the 95th percentile as a cutoff point, let's see what we 
-get at the 99th. It's 49.2666667 
-minutes. I like that better than 95%; Not only does it give us more data, it 
-brings us out of 33 minute upper bound and into the 50's, which isn't 
-unreasonable since subscribers are alloted 45 minutes. 
+Even the 100th longest trip of this month is close to 2 days. But instead of using the 95th 
+percentile as a cutoff point, let's see what we get at the 99th. It's 
+79.5025 minutes. I like that better than 95%; Not
+only does it give us more data, it brings us out of 30-odd minute upper bound and into the 70's,
+which isn't unreasonable since subscribers are alloted 45 minutes. An interesting note is that if we
+did take the 95th percentile, that value for this month is 
+35.5833333 minutes, which is actually longer than it was
+in the early months of the program. 
+
+Let's see how the average trip has changed throughout the course of the program. Here, we'll
+take each month's data up to the 99th percentile. 
+
+
+```r
+start <- ymd("2013-07-01"); end <- ymd("2015-10-01")
+months <- as.character(seq(start, end, by = "1 month"))
+avgs.mat <- NULL
+for (m in 1:length(months)){
+  t <- processMonthTrip(months[m], distancePairs)
+  #take up to the 99th quantile
+  upper <- quantile(t$tripduration, .99)
+  t <- subset(t, tripduration < upper)
+  avgs.mat <- rbind(avgs.mat, cbind(mean(t$tripduration), mean(t$birth.year, na.rm = TRUE), 
+                            mean(subset(t, gender != 0)$gender), mean(t$est.time),
+                            mean(t$est.distance)))
+
+}
+```
+
+```
+## Warning: All formats failed to parse. No formats found.
+```
+
+```
+## Warning: All formats failed to parse. No formats found.
+```
+
+```r
+avgs <- data.frame(as.Date(months), avgs.mat)
+names(avgs) <- c("month", "mean.duration", "mean.birth", "mean.gender", "mean.est.time", 
+                 "mean.est.dist")
+```
+
+
+```r
+avgs
+```
+
+```
+##         month mean.duration mean.birth mean.gender mean.est.time
+## 1  2013-07-01      883.9689   1975.479    1.234577     10.872144
+## 2  2013-08-01      879.4790   1975.768    1.243674     10.674058
+## 3  2013-09-01      822.5557   1975.710    1.246580     10.298578
+## 4  2013-10-01      756.3728   1975.786    1.239890      9.991583
+## 5  2013-11-01      688.2106   1975.564    1.228104      9.399494
+## 6  2013-12-01      646.4815   1974.936    1.209123      8.948699
+## 7  2014-01-01      616.9873   1974.818    1.194240      8.657986
+## 8  2014-02-01      667.9763   1975.506    1.189961      8.624128
+## 9  2014-03-01      664.1771   1975.257    1.205478      9.014798
+## 10 2014-04-01      769.7727   1975.757    1.220707      9.288168
+## 11 2014-05-01      813.6461   1975.936    1.230170      9.472808
+## 12 2014-06-01      829.3029   1976.156    1.241103      9.571821
+## 13 2014-07-01      802.4587   1976.316    1.237621      9.503078
+## 14 2014-08-01      824.2131   1976.601    1.237517      9.557901
+## 15 2014-09-01      787.6037   1976.495    1.237202      9.476498
+## 16 2014-10-01      745.6129   1976.420    1.226394      9.307548
+## 17 2014-11-01      677.7914   1976.014    1.217859      8.911049
+## 18 2014-12-01      647.6923   1975.111    1.199307      8.630829
+## 19 2015-01-01      604.7784   1974.968    1.185878      8.376092
+## 20 2015-02-01      602.5747   1975.317    1.169509      8.210556
+## 21 2015-03-01      652.5060   1975.306    1.191181      8.853545
+## 22 2015-04-01      766.9550   1976.039    1.218895      9.534190
+## 23 2015-05-01      845.1313   1976.253    1.234217      9.749767
+## 24 2015-06-01      797.6920   1976.260    1.232606      9.603843
+## 25 2015-07-01      828.9159   1976.651    1.239776      9.696822
+## 26 2015-08-01      853.9381   1977.148    1.246446            NA
+## 27 2015-09-01      846.2997   1977.315    1.249607            NA
+## 28 2015-10-01      797.9516   1977.007    1.240997            NA
+##    mean.est.dist
+## 1       1.699715
+## 2       1.664417
+## 3       1.598738
+## 4       1.542203
+## 5       1.436392
+## 6       1.358042
+## 7       1.306798
+## 8       1.302794
+## 9       1.373072
+## 10      1.425812
+## 11      1.461471
+## 12      1.480477
+## 13      1.468606
+## 14      1.478572
+## 15      1.462858
+## 16      1.427694
+## 17      1.356586
+## 18      1.306543
+## 19      1.262697
+## 20      1.230920
+## 21      1.345792
+## 22      1.466418
+## 23      1.509320
+## 24      1.487973
+## 25      1.498250
+## 26            NA
+## 27            NA
+## 28            NA
+```
+
+We're still missing values for the stations added in August 2015. Working from the opening of 
+CitiBikes to July 2015 gives us 25 months of full data, and we'll download the data for the new 
+stations later on. 
+
+
+```r
+avgs <- avgs[complete.cases(avgs),]
+breaks <- seq(1, nrow(avgs), by = 6)
+g <- ggplot(data.frame(month = as.numeric(row.names(avgs)), avgs[,2:6]), aes(x = month, 
+                                                                        y = mean.duration))
+g + geom_point(size = 6, color = "black") + geom_point(size = 5, color = "dodgerblue1") +
+  # geom_smooth(method = "lm", formula  = y~ns(x,df =5), se = FALSE, color = "black")
+  geom_smooth(method = "lm", formula = y ~ sin(2*pi*x/12) + cos(2*pi*x/12), se = FALSE, 
+              color = "black") + 
+  scale_x_continuous(breaks = breaks, labels = avgs[breaks, "month"])
+```
+
+![](figure/unnamed-chunk-16-1.png) 
+
+So there is a huge seasonal effect on ride duration, as might be expected. But setting that aside, 
+it doesn't appear that the duration has changed much year over year (with only 2 years of data to 
+look at). 

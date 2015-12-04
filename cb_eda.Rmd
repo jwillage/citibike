@@ -20,7 +20,7 @@ opts_chunk$set(echo = TRUE, cache = TRUE, cache.path = "cache/",
 Given a trip month file, explore some of the properties
 ```{r}
 source("cb_analysis.R") 
-distancePairs <- readRDS("data/distancePairs.rds")
+distancePairs <- readRDS("data/distancePairs.rds") 
 trip.month <- processMonthTrip("2013-10-01", distancePairs)
 long <- which(trip.month$tripduration > 7200)
 table(trip.month[long, ]$usertype) 
@@ -133,9 +133,9 @@ g + geom_boxplot(aes(fill = usertype)) + guides(fill = F)
 Here again we can see there's barely a difference between user types. 
 
 Let's shift focus and explore a more recent month. 
-(In March 2014, new stations were added: 491, 530). 
+ 
 
-```{r}
+```{r echo = F, eval = F}
 monthFile <- "2014-03-01" 
 rec.trip.month <- processMonthTrip(monthFile, distancePairs)
 summary(rec.trip.month)
@@ -145,8 +145,7 @@ unknown.indices <- which(!all.stations %in% distancePairs$start.station.id)
 print(unknown <- all.stations[unknown.indices])
 ```
 
-Note the NA's. We're missing some stations in our distancePairs list. 
-```{r eval = FALSE}
+```{r echo = F, eval = F}
 #calculate distance matrix for these missing values and append to distance.pairs
 
 #need to put this in it's own function for anytime we want to add more station combinations
@@ -229,9 +228,8 @@ rec.trip.month <- processMonthTrip(monthFile, distancePairs)
 summary (rec.trip.month) 
 ```
 
+We can add new stations to remove the NA's
 
-New station 255 introduced 3/15. 7/15 introduced 3180. In 8/15, 90 new stations were introduced. 
-Including a temporary ["ET Bike-In Movie Valet Station."](http://citibikeblog.tumblr.com/post/127176036862/et-the-extra-terrestrial-bike-in-movie)
 ```{r, eval = F}
 unknown <- findUnknownStations(monthFile, rec.trip.month, distancePairs)
 newDP <- addStations(unknown, distancePairs)
@@ -239,14 +237,27 @@ distancePairs.old <- distancePairs #keep the old one for backup
 distancePairs <- newDP
 ```
 
-Let's remove the person who had their bike out for over four weeks, and any other 
-suspiciously long trips. 
+Station additions:
 
-```{r}
+*  March 2014 added 491, 530  
+*  March 2015 added 255  
+*  July 2015 added 3180  
+*  August 2015, 90 new stations were introduced. Including a temporary [ET Bike-In Movie Valet Station.](http://citibikeblog.tumblr.com/post/127176036862/et-the-extra-terrestrial-bike-in-movie)
+
+
+```{r NAs removed}
+rec.trip.month <- processMonthTrip(monthFile, distancePairs)
+summary (rec.trip.month) 
+```
+
+Let's remove the person who had their bike out for 34 days, and any other suspiciously long trips. 
+
+```{r tail}
 tail(rec.trip.month[order(rec.trip.month$tripduration),]$tripduration, 100)
 ```
 
-Even the 100th longest trip of this month is close to 2 days. Instead of using the 95th percentile as a cutoff point, let's see what we get at the 99th. It's 
+Even the 100th longest trip of this month is close to 2 days. But instead of using the 95th 
+percentile as a cutoff point, let's see what we get at the 99th. It's 
 `r quantile(rec.trip.month[, "tripduration"], .99)/60` minutes. I like that better than 95%; Not
 only does it give us more data, it brings us out of 30-odd minute upper bound and into the 70's,
 which isn't unreasonable since subscribers are alloted 45 minutes. An interesting note is that if we
@@ -254,10 +265,10 @@ did take the 95th percentile, that value for this month is
 `r quantile(rec.trip.month[, "tripduration"], .95)/60` minutes, which is actually longer than it was
 in the early months of the program. 
 
-Let's see how the average trip length has changed throughout the course of the program. Here, we'll
+Let's see how the average trip has changed throughout the course of the program. Here, we'll
 take each month's data up to the 99th percentile. 
 
-```{r}
+```{r process all months, results = "hide"}
 start <- ymd("2013-07-01"); end <- ymd("2015-10-01")
 months <- as.character(seq(start, end, by = "1 month"))
 avgs.mat <- NULL
@@ -274,6 +285,9 @@ for (m in 1:length(months)){
 avgs <- data.frame(as.Date(months), avgs.mat)
 names(avgs) <- c("month", "mean.duration", "mean.birth", "mean.gender", "mean.est.time", 
                  "mean.est.dist")
+```
+
+```{r }
 avgs
 ```
 
@@ -283,9 +297,14 @@ stations later on.
 
 ```{r}
 avgs <- avgs[complete.cases(avgs),]
-g <- ggplot(avgs, aes(x = month, y = mean.duration))
+breaks <- seq(1, nrow(avgs), by = 6)
+g <- ggplot(data.frame(month = as.numeric(row.names(avgs)), avgs[,2:6]), aes(x = month, 
+                                                                        y = mean.duration))
 g + geom_point(size = 6, color = "black") + geom_point(size = 5, color = "dodgerblue1") +
-  geom_smooth(method = "lm", formula  = y~ns(x,df =5), se = FALSE, color = "black")
+  # geom_smooth(method = "lm", formula  = y~ns(x,df =5), se = FALSE, color = "black")
+  geom_smooth(method = "lm", formula = y ~ sin(2*pi*x/12) + cos(2*pi*x/12), se = FALSE, 
+              color = "black") + 
+  scale_x_continuous(breaks = breaks, labels = avgs[breaks, "month"])
 ```
 
 So there is a huge seasonal effect on ride duration, as might be expected. But setting that aside, 
