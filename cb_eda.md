@@ -457,9 +457,9 @@ stations later on.
 
 ```r
 avgs <- avgs[complete.cases(avgs),]
+avgs$month_no <- as.numeric(row.names(avgs))
 breaks <- seq(1, nrow(avgs), by = 6)
-g <- ggplot(data.frame(month = as.numeric(row.names(avgs)), avgs[,2:6]), aes(x = month, 
-                                                                        y = mean.duration))
+g <- ggplot(avgs, aes(x = month_no, y = mean.duration))
 g + geom_point(size = 6, color = "black") + geom_point(size = 5, color = "dodgerblue1") +
   # geom_smooth(method = "lm", formula  = y~ns(x,df =5), se = FALSE, color = "black")
   geom_smooth(method = "lm", formula = y ~ sin(2*pi*x/12) + cos(2*pi*x/12), se = FALSE, 
@@ -471,4 +471,57 @@ g + geom_point(size = 6, color = "black") + geom_point(size = 5, color = "dodger
 
 So there is a huge seasonal effect on ride duration, as might be expected. But setting that aside, 
 it doesn't appear that the duration has changed much year over year (with only 2 years of data to 
-look at). 
+look at). Let's regress out the seasonality and see what happens. 
+
+
+```r
+fit <- lm(mean.duration ~ sin(2 * pi * month_no/12) + cos(2 * pi * month_no/12), data = avgs)
+g <- ggplot(data.frame(mean.duration = avgs$mean.duration, resid.duration = resid(fit)), aes(x=mean.duration, y=resid.duration))
+g + geom_point(size = 6, color = "black") + geom_point(size = 5, color = "red")
+```
+
+![](figure/unnamed-chunk-17-1.png) 
+
+There's no apparent pattern in the residuals, which is good. 
+
+Taking a broader look at all the pairwise comparisons.
+
+
+```r
+panel.cor <- function(x, y, digits=2, prefix="", cex.cor) 
+{
+    usr <- par("usr"); on.exit(par(usr)) 
+    par(usr = c(0, 1, 0, 1)) 
+    r <- abs(cor(x, y)) 
+    txt <- format(c(r, 0.123456789), digits=digits)[1] 
+    txt <- paste(prefix, txt, sep="") 
+    if(missing(cex.cor)) cex <- 0.8/strwidth(txt) 
+ 
+    test <- cor.test(x,y) 
+    # borrowed from printCoefmat
+    Signif <- symnum(test$p.value, corr = FALSE, na = FALSE, 
+                  cutpoints = c(0, 0.001, 0.01, 0.05, 0.1, 1),
+                  symbols = c("***", "**", "*", ".", " ")) 
+ 
+    text(0.5, 0.5, txt, cex = cex * r) 
+    text(.8, .8, Signif, cex=cex, col=2) 
+}
+pairs(month ~ ., data = avgs, upper.panel = panel.cor)
+```
+
+![](figure/pairs-1.png) 
+
+Ignoring the perfect correlation between month and month_no, we see strong correlation between 
+mean duration and the estimated Google Maps means. That serves as a good sanity check: a correlation 
+of 0.9 between actual mean duration and the
+estimated mean duration, and correlation of 0.91
+between the mean duration and the mean estimated distance. Of course, we want to truly confirm the
+estimated durations to the actual, which will allow us to use the estimated distances later down the
+line. We'll want to do this on a row-by-row bassis, not over each month's mean.  
+
+We see a strong correlation of 0.89 between 
+gender and duration, which seems interesting. Also, correlations of 
+0.71 between age and gender, and age and duration. 
+
+We again see the sinusoidal pattern when looking at month by mean duration (and the estimates), but, 
+oddly, gender and age as well.
