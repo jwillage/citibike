@@ -476,8 +476,16 @@ look at). Let's regress out the seasonality and see what happens.
 
 ```r
 fit <- lm(mean.duration ~ sin(2 * pi * month_no/12) + cos(2 * pi * month_no/12), data = avgs)
-g <- ggplot(data.frame(mean.duration = avgs$mean.duration, resid.duration = resid(fit)), aes(x=mean.duration, y=resid.duration))
-g + geom_point(size = 6, color = "black") + geom_point(size = 5, color = "red")
+g <- ggplot(data.frame(mean.duration = avgs$mean.duration, resid.duration = resid(fit)),
+            aes(x=mean.duration, y=resid.duration))
+g <- g + geom_point(size = 6, color = "black") + geom_point(size = 5, color = "red")
+g2 <- ggplot(data.frame(month.no = avgs$month_no, resid.duration = resid(fit)), 
+             aes(x = month.no, y = resid.duration))
+g2 <- g2 + geom_point(size = 6, color = "black") + geom_point(size = 5, color = "lightblue")
+
+par(mfrow = c(1, 2))
+plot(avgs$mean.duration, resid(fit), pch = 21, cex = 2,  bg = "red")
+plot(avgs$month_no, resid(fit), pch = 21, cex = 2,  bg = "lightblue")
 ```
 
 ![](figure/unnamed-chunk-17-1.png) 
@@ -525,3 +533,43 @@ gender and duration, which seems interesting. Also, correlations of
 
 We again see the sinusoidal pattern when looking at month by mean duration (and the estimates), but, 
 oddly, gender and age as well.
+
+Let's take a closer look at the relationship between gender and average duration. 
+
+```r
+g <- ggplot(data = avgs, aes(x = mean.gender, y = mean.duration))
+g + geom_point(size = 6, color = "black") + geom_point(size = 5, color = "green") +
+    geom_smooth(method = "lm", formula = y ~ x, se = FALSE, color = "black")
+```
+
+![](figure/unnamed-chunk-18-1.png) 
+
+```r
+fit <- lm(mean.duration ~ mean.gender, avgs)
+print(s <- summary(fit))
+```
+
+```
+## 
+## Call:
+## lm(formula = mean.duration ~ mean.gender, data = avgs)
+## 
+## Residuals:
+##     Min      1Q  Median      3Q     Max 
+## -85.054 -21.307   7.725  27.857  86.691 
+## 
+## Coefficients:
+##             Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)  -3783.0      482.0  -7.849 5.94e-08 ***
+## mean.gender   3710.0      394.9   9.396 2.45e-09 ***
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 41.53 on 23 degrees of freedom
+## Multiple R-squared:  0.7933,	Adjusted R-squared:  0.7843 
+## F-statistic: 88.28 on 1 and 23 DF,  p-value: 2.446e-09
+```
+
+The adjusted $R^2 = 0.7843$, not super conclusive. While we do get
+a significant p-value, the standard error of 394.86is very large. A better
+analysis would be a t-test between each gender and their duration, before taking means. 
