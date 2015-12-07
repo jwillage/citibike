@@ -571,5 +571,104 @@ print(s <- summary(fit))
 ```
 
 The adjusted $R^2 = 0.7843$, not super conclusive. While we do get
-a significant p-value, the standard error of 394.86is very large. A better
+a significant p-value, the standard error of 394.86 is very large. A better
 analysis would be a t-test between each gender and their duration, before taking means. 
+
+
+```r
+gender.mat <- NULL
+
+for (m in 1:length(months)){
+  t <- processMonthTrip(months[m], distancePairs)
+  t <- subset(t, tripduration < quantile(t$tripduration, .99) & gender != 0)
+#  t <- subset(t, gender != 0)
+  gender.mat <- rbind(gender.mat, t[, c("tripduration", "gender")])
+}
+```
+
+```
+## Warning: All formats failed to parse. No formats found.
+```
+
+```
+## Warning: All formats failed to parse. No formats found.
+```
+
+
+```r
+gender <- data.frame(gender.mat)
+rm(gender.mat)
+print(gs <- summary(gender))
+```
+
+```
+##   tripduration        gender     
+##  Min.   :  60.0   Min.   :1.000  
+##  1st Qu.: 375.0   1st Qu.:1.000  
+##  Median : 584.0   Median :1.000  
+##  Mean   : 723.7   Mean   :1.231  
+##  3rd Qu.: 926.0   3rd Qu.:1.000  
+##  Max.   :5280.0   Max.   :2.000
+```
+
+After gathering all the trip durations and gender for each ride in the complete dataset, and having 
+removed the rows with unknown gender, we can take a t-test. In the gender variable, 1 = male and 
+2 = female. The mean gender is leaning much closer towards men. However, we discarded the unknown 
+genders, and we cannot say with certainty that all of those removed rows were not women, for 
+instance. (Also note the average trip duration is just about 12 minutes, much lower than the alloted
+time for each trip).
+
+
+```r
+male <- subset(gender, gender == 1)
+female <- subset(gender, gender == 2)
+remove(gender)
+par(mfrow = c(1, 2))
+hist(female$tripduration); hist(male$tripduration)
+```
+
+![](figure/unnamed-chunk-20-1.png) 
+
+```r
+#Not too normal looking, but remember the log histograms from earlier?
+hist(log(female$tripduration)); hist(log(male$tripduration))
+```
+
+![](figure/unnamed-chunk-20-2.png) 
+
+We'll take a t-test on the log-transformed duration by gender
+
+
+```r
+t <- t.test(log(female$tripduration), log(male$tripduration))
+t
+```
+
+```
+## 
+## 	Welch Two Sample t-test
+## 
+## data:  log(female$tripduration) and log(male$tripduration)
+## t = 464.76, df = 7163500, p-value < 2.2e-16
+## alternative hypothesis: true difference in means is not equal to 0
+## 95 percent confidence interval:
+##  0.1662009 0.1676086
+## sample estimates:
+## mean of x mean of y 
+##  6.500096  6.333191
+```
+
+```r
+exp(t$conf.int)
+```
+
+```
+## [1] 1.180810 1.182474
+## attr(,"conf.level")
+## [1] 0.95
+```
+
+The t-test returns significant results: There is a true difference in trip duration between genders.
+95% of the time a female rider will be about 18% longer than a male rider. Are men riding faster? Or
+perhaps women are riding longer distances? Let's look at some pairs of destinations to compare men's
+trips to women's. First though, we'll have to validate that our estimated distances are usable. 

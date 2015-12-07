@@ -379,3 +379,50 @@ print(s <- summary(fit))
 The adjusted $R^2 = `r round(s$adj.r.squared, 4)`$, not super conclusive. While we do get
 a significant p-value, the standard error of `r round(s$coef[2, 2], 2)` is very large. A better
 analysis would be a t-test between each gender and their duration, before taking means. 
+
+```{r all months gender, results = "hide"}
+gender.mat <- NULL
+
+for (m in 1:length(months)){
+  t <- processMonthTrip(months[m], distancePairs)
+  t <- subset(t, tripduration < quantile(t$tripduration, .99) & gender != 0)
+#  t <- subset(t, gender != 0)
+  gender.mat <- rbind(gender.mat, t[, c("tripduration", "gender")])
+}
+```
+
+```{r}
+gender <- data.frame(gender.mat)
+rm(gender.mat)
+print(gs <- summary(gender))
+```
+
+After gathering all the trip durations and gender for each ride in the complete dataset, and having 
+removed the rows with unknown gender, we can take a t-test. In the gender variable, 1 = male and 
+2 = female. The mean gender is leaning much closer towards men. However, we discarded the unknown 
+genders, and we cannot say with certainty that all of those removed rows were not women, for 
+instance. (Also note the average trip duration is just about 12 minutes, much lower than the alloted
+time for each trip).
+
+```{r}
+male <- subset(gender, gender == 1)
+female <- subset(gender, gender == 2)
+remove(gender)
+par(mfrow = c(1, 2))
+hist(female$tripduration); hist(male$tripduration)
+#Not too normal looking, but remember the log histograms from earlier?
+hist(log(female$tripduration)); hist(log(male$tripduration))
+```
+
+We'll take a t-test on the log-transformed duration by gender
+
+```{r}
+t <- t.test(log(female$tripduration), log(male$tripduration))
+t
+exp(t$conf.int)
+```
+
+The t-test returns significant results: There is a true difference in trip duration between genders.
+95% of the time a female rider will be about 18% longer than a male rider. Are men riding faster? Or
+perhaps women are riding longer distances? Let's look at some pairs of destinations to compare men's
+trips to women's. First though, we'll have to validate that our estimated distances are usable. 
