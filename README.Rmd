@@ -10,7 +10,7 @@ bikes for commuting purposes.
 
 ##Files  
 *  **cb_analysis.R** - R data processing
-*  **cb_eda.Rmd** - Exploratory analysis
+*  **cb_eda.Rmd** - Exploratory analysis. See cb_eda.md for knitted version.
 *  **README.Rmd** - this file  
 
 
