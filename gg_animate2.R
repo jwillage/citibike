@@ -46,6 +46,10 @@ gg_animate2 <- function(p = last_plot(), filename = NULL,
         if (length (l) > 0){
           b$data[[l]]$label <- paste(substr(f, 6, 7), substr(f, 1, 4))
         }
+        m <- which(rbind(sapply(b$data, function(x) x$label == "@lustyandlewd")) == TRUE)
+        if (length (m) > 0){
+          b$data[[m]]$label <- NULL
+        }
       }
     }
     
