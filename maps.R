@@ -32,18 +32,7 @@ g <- ggmap(mymap13, extent = "device") +
        geom_point(aes(x = as.numeric(station.longitude), y = as.numeric(station.latitude), size = n,
                       frame = mo), data = sums, alpha = 0.3, color = "blue") +
        scale_size(range = c(3, 8)) +
-       theme(
-            legend.position = "none",
-            legend.key = element_blank(), 
-            legend.text = element_blank(),
-            axis.title = element_blank(),
-            axis.text = element_blank(), 
-            axis.ticks = element_blank(),
-            panel.background = element_rect(color = "black", fill = "white"),
-            plot.background = element_rect(fill = "white", color = "white"),
-            plot.title = element_text(size = 18),
-            panel.border = element_rect(fill = NA, color = "white"),
-            plot.margin = unit(c(0, 0, 0, 0), "lines")
-            ) 
+       theme_nothing() +
+       annotate("text", label = "frame", x = -74.026, y = 40.69, size = 10) #gg_animate2 specific
 
-gg_animate(g)
+gg_animate2(g, ani.width = 640, ani.height = 640)
