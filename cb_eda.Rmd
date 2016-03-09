@@ -313,19 +313,23 @@ look at). Let's regress out the seasonality and see what happens.
 
 ```{r}
 fit <- lm(mean.duration ~ sin(2 * pi * month_no/12) + cos(2 * pi * month_no/12), data = avgs)
-g <- ggplot(data.frame(mean.duration = avgs$mean.duration, resid.duration = resid(fit)),
-            aes(x=mean.duration, y=resid.duration))
-g <- g + geom_point(size = 6, color = "black") + geom_point(size = 5, color = "red")
-g2 <- ggplot(data.frame(month.no = avgs$month_no, resid.duration = resid(fit)), 
-             aes(x = month.no, y = resid.duration))
-g2 <- g2 + geom_point(size = 6, color = "black") + geom_point(size = 5, color = "lightblue")
-
-par(mfrow = c(1, 2))
-plot(avgs$mean.duration, resid(fit), pch = 21, cex = 2,  bg = "red")
-plot(avgs$month_no, resid(fit), pch = 21, cex = 2,  bg = "lightblue")
+plot(avgs$month_no, resid(fit), pch = 21, cex = 2,  bg = "red")
 ```
 
-There's no apparent pattern in the residuals, which is good. 
+The residals show what appears to be a descending pattern over time. Let's add time in as a variable
+of the regression model and see if it gives a better fit.
+
+```{r}
+fit2 <- lm(mean.duration ~ sin(2 * pi * month_no/12) + cos(2 * pi * month_no/12) + month_no, data = avgs)
+coef(fit2)
+plot(avgs$month_no, resid(fit2), pch = 21, cex = 2,  bg = "lightblue")
+anova(fit, fit2)
+```
+
+Adding in the month fixes the pattern in the residual plot, and it also reduces the residual sum of
+squares by 3610. Looking at the coefficients, this means there is a `r round(coef(fit2)[4], 2)`
+reduction in average seconds, each month. Along this model, by Jaunary 2018 the average trip time 
+would be down to `r round(predict(fit2, newdata = data.frame(month_no = 55))/60, 2)` minutes.  
 
 Taking a broader look at all the pairwise comparisons.
 

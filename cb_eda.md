@@ -479,21 +479,54 @@ look at). Let's regress out the seasonality and see what happens.
 
 ```r
 fit <- lm(mean.duration ~ sin(2 * pi * month_no/12) + cos(2 * pi * month_no/12), data = avgs)
-g <- ggplot(data.frame(mean.duration = avgs$mean.duration, resid.duration = resid(fit)),
-            aes(x=mean.duration, y=resid.duration))
-g <- g + geom_point(size = 6, color = "black") + geom_point(size = 5, color = "red")
-g2 <- ggplot(data.frame(month.no = avgs$month_no, resid.duration = resid(fit)), 
-             aes(x = month.no, y = resid.duration))
-g2 <- g2 + geom_point(size = 6, color = "black") + geom_point(size = 5, color = "lightblue")
-
-par(mfrow = c(1, 2))
-plot(avgs$mean.duration, resid(fit), pch = 21, cex = 2,  bg = "red")
-plot(avgs$month_no, resid(fit), pch = 21, cex = 2,  bg = "lightblue")
+plot(avgs$month_no, resid(fit), pch = 21, cex = 2,  bg = "red")
 ```
 
 ![](figure/unnamed-chunk-17-1.png) 
 
-There's no apparent pattern in the residuals, which is good. 
+The residals show what appears to be a descending pattern over time. Let's add time in as a variable
+of the regression model and see if it gives a better fit.
+
+
+```r
+fit2 <- lm(mean.duration ~ sin(2 * pi * month_no/12) + cos(2 * pi * month_no/12) + month_no, data = avgs)
+coef(fit2)
+```
+
+```
+##               (Intercept) sin(2 * pi * month_no/12) 
+##                763.475925                 53.455141 
+## cos(2 * pi * month_no/12)                  month_no 
+##                103.240819                 -1.785164
+```
+
+```r
+plot(avgs$month_no, resid(fit2), pch = 21, cex = 2,  bg = "lightblue")
+```
+
+![](figure/unnamed-chunk-18-1.png) 
+
+```r
+anova(fit, fit2)
+```
+
+```
+## Analysis of Variance Table
+## 
+## Model 1: mean.duration ~ sin(2 * pi * month_no/12) + cos(2 * pi * month_no/12)
+## Model 2: mean.duration ~ sin(2 * pi * month_no/12) + cos(2 * pi * month_no/12) + 
+##     month_no
+##   Res.Df   RSS Df Sum of Sq      F  Pr(>F)  
+## 1     22 17141                              
+## 2     21 13531  1    3610.2 5.6032 0.02761 *
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+```
+
+Adding in the month fixes the pattern in the residual plot, and it also reduces the residual sum of
+squares by 3610. Looking at the coefficients, this means there is a -1.79
+reduction in average seconds, each month. Along this model, by Jaunary 2018 the average trip time 
+would be down to 9.15 minutes.  
 
 Taking a broader look at all the pairwise comparisons.
 
@@ -545,7 +578,7 @@ g + geom_point(size = 6, color = "black") + geom_point(size = 5, color = "green"
     geom_smooth(method = "lm", formula = y ~ x, se = FALSE, color = "black")
 ```
 
-![](figure/unnamed-chunk-18-1.png) 
+![](figure/unnamed-chunk-19-1.png) 
 
 ```r
 fit <- lm(mean.duration ~ mean.gender, avgs)
@@ -630,14 +663,14 @@ par(mfrow = c(1, 2))
 hist(female$tripduration); hist(male$tripduration)
 ```
 
-![](figure/unnamed-chunk-20-1.png) 
+![](figure/unnamed-chunk-21-1.png) 
 
 ```r
 #Not too normal looking, but remember the log histograms from earlier?
 hist(log(female$tripduration)); hist(log(male$tripduration))
 ```
 
-![](figure/unnamed-chunk-20-2.png) 
+![](figure/unnamed-chunk-21-2.png) 
 
 We'll take a t-test on the log-transformed duration by gender
 

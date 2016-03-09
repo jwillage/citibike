@@ -9,7 +9,7 @@ library(tweenr)
 
 start <- ymd("2013-07-01"); end <- ymd("2015-10-01")
 months <- as.character(seq(start, end, by = "1 month"))
-distance <- unique(distancePairs[, c("start.station.id", "start.station.latitude", 
+location <- unique(distancePairs[, c("start.station.id", "start.station.latitude", 
                                      "start.station.longitude"), with = FALSE])
 mymap13 <- get_map(location = "40.72417399459069,-73.98639034958494", zoom = 13, 
                    maptype = "toner-lines")
@@ -24,7 +24,7 @@ for (m in 1:length(months)){
   sums.mat <- rbind(sums.mat, start.station)
 }
 
-sums <- sums.mat %>% left_join(y = distance, by = c("station.id" = "start.station.id")) %>% 
+sums <- sums.mat %>% left_join(y = location, by = c("station.id" = "start.station.id")) %>% 
           select(station.id, n, mo, start, station.latitude = start.station.latitude, 
                  station.longitude = start.station.longitude)
 sums$mo <- as.factor(sums$mo)
@@ -63,7 +63,7 @@ top <- as.data.table(as.data.frame(top))
 top <- top[top[, .I[order(total, decreasing = TRUE)[1]], by = station.id]$V1, 
            c("station.id", "usertype", "total", "pct"), with = FALSE]
 top <- as.data.frame(top)
-top <- top %>% left_join(y = distance, by = c("station.id" = "start.station.id")) %>% 
+top <- top %>% left_join(y = location, by = c("station.id" = "start.station.id")) %>% 
   select(station.id, usertype, total, pct, station.latitude = start.station.latitude, 
          station.longitude = start.station.longitude)
 
