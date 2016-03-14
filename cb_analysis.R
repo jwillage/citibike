@@ -310,6 +310,9 @@ s319.s152 <- (distancePairs$start.station.id == 319 & distancePairs$end.station.
 distancePairs[s319.s152, ]$est.time <- 3
 distancePairs[s319.s152, ]$est.distance <- 0.3
 
+s223.s345 <- (distancePairs$start.station.id == 223 & distancePairs$end.station.id == 345) |
+  (distancePairs$start.station.id == 345 & distancePairs$end.station.id == 223)
+distancePairs[s223.s345, ]$est.time <- 1
 
 same <- distancePairs$start.station.id == distancePairs$end.station.id
 err <- distancePairs[same, ]$est.time > 1
