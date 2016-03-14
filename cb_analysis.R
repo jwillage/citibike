@@ -293,3 +293,6 @@ stationCombs <- data.table()
 #average duration by customer type. Divide by 60 to convert to minutes
  #dat[, mean(tripduration/60, na.rm = T), by = usertype]
 
+problems <- distancePairs$start.station.id %in% c(255, 3180) |
+            distancePairs$end.station.id %in% c(255, 3180)
+distancePairs[problems, "est.time"] <- distancePairs[problems, "est.time"]/60
