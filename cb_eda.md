@@ -523,10 +523,40 @@ anova(fit, fit2)
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ```
 
+```r
+sumCoef <- summary(fit2)$coef
+```
+
 Adding in the month fixes the pattern in the residual plot, and it also reduces the residual sum of
 squares by 3610. Looking at the coefficients, this means there is a -1.79
-reduction in average seconds, each month. Along this model, by Jaunary 2018 the average trip time 
-would be down to 9.15 minutes.  
+reduction in average seconds, each month, +/- 
+1.57 seconds. Along this model, by Jaunary 2018 the 
+average monthly trip time estimate would be down to 
+9.15 minutes.  
+
+
+```r
+newx <- data.frame(month_no = 1:60)
+p1 <- data.frame(predict(fit2, newdata = newx, interval = ("confidence")))
+p2 <- data.frame(predict(fit2, newdata = newx, interval = ("prediction")))
+p1$interval <- "confidence"
+p2$interval <- "prediction"
+p1$x <- newx$month_no
+p2$x <- newx$month_no
+dat <- rbind(p1, p2)
+names(dat)[1] <- "y"
+breaks <- seq(7, nrow(newx), by = 12)
+labels <- paste0(2014:2018, "-01")
+
+g <- ggplot(dat, aes(x = x, y = y))
+g + geom_ribbon(aes(ymin = lwr, ymax = upr, fill = interval), alpha = 0.2) +
+geom_smooth(method = "lm", formula = y ~ sin(2*pi*x/12) + cos(2*pi*x/12) + x, se = FALSE, 
+              color = "black") +
+geom_point(data = avgs, aes(x = month_no, y = mean.duration), size = 4) +
+geom_point(data = avgs, aes(x = month_no, y = mean.duration), size = 3, color = "dodgerblue")  +  scale_x_continuous(breaks = breaks, labels = labels)
+```
+
+![](figure/unnamed-chunk-19-1.png) 
 
 Taking a broader look at all the pairwise comparisons.
 
@@ -578,7 +608,7 @@ g + geom_point(size = 6, color = "black") + geom_point(size = 5, color = "green"
     geom_smooth(method = "lm", formula = y ~ x, se = FALSE, color = "black")
 ```
 
-![](figure/unnamed-chunk-19-1.png) 
+![](figure/unnamed-chunk-20-1.png) 
 
 ```r
 fit <- lm(mean.duration ~ mean.gender, avgs)
@@ -663,14 +693,14 @@ par(mfrow = c(1, 2))
 hist(female$tripduration); hist(male$tripduration)
 ```
 
-![](figure/unnamed-chunk-21-1.png) 
+![](figure/unnamed-chunk-22-1.png) 
 
 ```r
 #Not too normal looking, but remember the log histograms from earlier?
 hist(log(female$tripduration)); hist(log(male$tripduration))
 ```
 
-![](figure/unnamed-chunk-21-2.png) 
+![](figure/unnamed-chunk-22-2.png) 
 
 We'll take a t-test on the log-transformed duration by gender
 
@@ -708,3 +738,13 @@ The t-test returns significant results: There is a true difference in trip durat
 95% of the time a female rider will be about 18% longer than a male rider. Are men riding faster? Or
 perhaps women are riding longer distances? Let's look at some pairs of destinations to compare men's
 trips to women's. First though, we'll have to validate that our estimated distances are usable. 
+
+
+for (m in 1:length(months)){
+  t <- processMonthTrip(months[m], distancePairs)
+  t <- subset(t, tripduration < upper)
+  avgs.mat <- rbind(avgs.mat, cbind(mean(t$tripduration), mean(t$birth.year, na.rm = TRUE), 
+                            mean(subset(t, gender != 0)$gender), mean(t$est.time),
+                            mean(t$est.distance)))
+
+}
