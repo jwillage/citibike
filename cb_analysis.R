@@ -293,6 +293,19 @@ stationCombs <- data.table()
 #average duration by customer type. Divide by 60 to convert to minutes
  #dat[, mean(tripduration/60, na.rm = T), by = usertype]
 
-problems <- distancePairs$start.station.id %in% c(255, 3180) |
-            distancePairs$end.station.id %in% c(255, 3180)
-distancePairs[problems, "est.time"] <- distancePairs[problems, "est.time"]/60
+distm(c(40.71625008 ,-74.0091059 ), c( 40.71473993  , -74.00910627))
+short <- NULL
+for (i in 1 : nrow(distancePairs)) {
+  d <- distm(c(as.numeric(distancePairs[i, start.station.latitude]), 
+               as.numeric(distancePairs[i, start.station.longitude])),
+             c(as.numeric(distancePairs[i, end.station.latitude]), 
+               as.numeric(distancePairs[i, end.station.longitude])))
+  short <- rbind(short, d)
+}
+
+s <- distancePairs[short[, 1] < 85, ]
+
+same <- distancePairs$start.station.id == distancePairs$end.station.id
+err <- distancePairs[same, ]$est.time > 1
+distancePairs[same, ][err, ]$est.time <- 1
+distancePairs[same, ][err, ]$est.distance <- 0
