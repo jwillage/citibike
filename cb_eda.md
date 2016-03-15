@@ -7,6 +7,10 @@ November 18, 2015
 ## Warning: package 'ggplot2' was built under R version 3.2.3
 ```
 
+```
+## Warning: package 'ggmap' was built under R version 3.2.3
+```
+
 Given a trip month file, explore some of the properties
 
 ```r
@@ -739,12 +743,454 @@ The t-test returns significant results: There is a true difference in trip durat
 perhaps women are riding longer distances? Let's look at some pairs of destinations to compare men's
 trips to women's. First though, we'll have to validate that our estimated distances are usable. 
 
+We start with a single month to assess the reliability of the estimated data.
 
-for (m in 1:length(months)){
-  t <- processMonthTrip(months[m], distancePairs)
-  t <- subset(t, tripduration < upper)
-  avgs.mat <- rbind(avgs.mat, cbind(mean(t$tripduration), mean(t$birth.year, na.rm = TRUE), 
-                            mean(subset(t, gender != 0)$gender), mean(t$est.time),
-                            mean(t$est.distance)))
 
-}
+```r
+distancePairs <- readRDS("data/distancePairs.rds") 
+rec.trip.month <- processMonthTrip("2015-05-01", distancePairs)
+```
+
+```
+## 
+Read 28.1% of 961986 rows
+Read 37.4% of 961986 rows
+Read 47.8% of 961986 rows
+Read 53.0% of 961986 rows
+Read 72.8% of 961986 rows
+Read 81.1% of 961986 rows
+Read 95.6% of 961986 rows
+Read 961986 rows and 15 (of 15) columns from 0.173 GB file in 00:00:09
+```
+
+```r
+r <- rec.trip.month[rec.trip.month$start.station.id != rec.trip.month$end.station.id, ]
+r <- r[, c("start.station.id", "end.station.id", "tripduration", "est.time", "est.distance")]
+r$tripduration <- r$tripduration/60
+r <- r %>% mutate(error = abs((tripduration - est.time)/tripduration))
+summary(r)
+```
+
+```
+##  start.station.id   end.station.id      tripduration         est.time     
+##  Length:936140      Length:936140      Min.   :    1.00   Min.   : 1.000  
+##  Class :character   Class :character   1st Qu.:    6.88   1st Qu.: 6.000  
+##  Mode  :character   Mode  :character   Median :   11.15   Median : 9.000  
+##                                        Mean   :   16.17   Mean   : 9.984  
+##                                        3rd Qu.:   18.48   3rd Qu.:13.000  
+##                                        Max.   :48961.70   Max.   :55.000  
+##                                                           NA's   :1       
+##   est.distance        error        
+##  Min.   : 0.000   Min.   : 0.0000  
+##  1st Qu.: 0.800   1st Qu.: 0.1152  
+##  Median : 1.300   Median : 0.2393  
+##  Mean   : 1.552   Mean   : 0.2923  
+##  3rd Qu.: 2.000   3rd Qu.: 0.4059  
+##  Max.   :10.500   Max.   :30.7143  
+##                   NA's   :1
+```
+
+After filtering out trips that start and end at the same station, we calculate the error and see 
+the summaries. The median error is around 24%, but there are some that are thousands of times off.
+
+
+```r
+head(r[order(r$error, decreasing = T), ], 10)
+```
+
+```
+##        start.station.id end.station.id tripduration est.time est.distance
+## 155621              255            467    19.416667     1320          3.7
+## 130544              243            255    26.550000     1500          4.0
+## 155618              255            243    26.783333     1440          4.0
+## 155619              255            344    39.600000     1920          5.2
+## 155622              255            467    30.633333     1320          3.7
+## 155620              255            344    45.300000     1920          5.2
+## 274898              314            255    48.800000     1860          5.1
+## 274897              314            255    49.916667     1860          5.1
+## 181753              271            523     1.166667       37          6.1
+## 853190              521            337     1.100000       27          5.1
+##           error
+## 155621 66.98283
+## 130544 55.49718
+## 155618 52.76478
+## 155619 47.48485
+## 155622 42.09032
+## 155620 41.38411
+## 274898 37.11475
+## 274897 36.26210
+## 181753 30.71429
+## 853190 23.54545
+```
+
+```r
+rec.trip.month[rec.trip.month$start.station.id == 271 & rec.trip.month$end.station.id == 523, ]
+```
+
+```
+##        start.station.id end.station.id tripduration           starttime
+## 188906              271            523           70 2015-05-15 09:37:59
+##                   stoptime bikeid   usertype birth.year gender est.time
+## 188906 2015-05-15 09:39:09  17609 Subscriber       1978      1       37
+##        est.distance
+## 188906          6.1
+```
+
+Examining the most offensive estimate, it shows a duration of 70 seconds for a 6 mile trip. A manual 
+check confirms the start and end station are indeed at midtown and Barclay's Center, 6 miles apart. 
+The same holds true for the next several highest-error records. 
+
+
+```r
+hist(r$error, breaks = 500,  xaxt="n")
+axis(1, at = seq(0, 30, by =1), labels = seq(0, 30, by = 1))
+```
+
+![](figure/unnamed-chunk-26-1.png) 
+
+The density drops off after about 2 (= 200% error), suggesting all the remaining rows are outliers,
+either due to error in the record or a faulty comparison between actual and estimated. We'll 
+recalculate error on this subset, leaving off the absolute value function, to see which rows are 
+massively over and massively under. 
+
+
+```r
+r <- r %>% mutate(rel.err = (tripduration - est.time)/tripduration)
+summary(r)
+```
+
+```
+##  start.station.id   end.station.id      tripduration     
+##  Length:936140      Length:936140      Min.   :    1.00  
+##  Class :character   Class :character   1st Qu.:    6.88  
+##  Mode  :character   Mode  :character   Median :   11.15  
+##                                        Mean   :   16.17  
+##                                        3rd Qu.:   18.48  
+##                                        Max.   :48961.70  
+##                                                          
+##     est.time        est.distance        error            rel.err        
+##  Min.   :   1.00   Min.   : 0.000   Min.   : 0.0000   Min.   :-66.9828  
+##  1st Qu.:   6.00   1st Qu.: 0.800   1st Qu.: 0.1152   1st Qu.:  0.0000  
+##  Median :   9.00   Median : 1.300   Median : 0.2393   Median :  0.1843  
+##  Mean   :  10.01   Mean   : 1.552   Mean   : 0.2927   Mean   :  0.1742  
+##  3rd Qu.:  13.00   3rd Qu.: 2.000   3rd Qu.: 0.4059   3rd Qu.:  0.3684  
+##  Max.   :3300.00   Max.   :10.500   Max.   :66.9828   Max.   :  0.9999  
+##  NA's   :1                          NA's   :1         NA's   :1
+```
+
+```r
+head(r[order(r$rel.err, decreasing = TRUE),], 10)
+```
+
+```
+##        start.station.id end.station.id tripduration est.time est.distance
+## 578856              445            339    14111.100        2          0.5
+## 138749              250            253    13229.450        6          1.0
+## 71109              2002            539     4357.000        2          0.2
+## 438464              387            264     5544.517        3          0.5
+## 133795              247            369     5209.283        3          0.5
+## 624475              460            389     3086.467        2          0.3
+## 402741              373            366    12981.567        9          1.2
+## 195573              281            499     6812.217        5          0.6
+## 295749              325            499    25599.067       19          3.1
+## 432422              383            499    19847.083       15          2.7
+##            error   rel.err
+## 578856 0.9998583 0.9998583
+## 138749 0.9995465 0.9995465
+## 71109  0.9995410 0.9995410
+## 438464 0.9994589 0.9994589
+## 133795 0.9994241 0.9994241
+## 624475 0.9993520 0.9993520
+## 402741 0.9993067 0.9993067
+## 195573 0.9992660 0.9992660
+## 295749 0.9992578 0.9992578
+## 432422 0.9992442 0.9992442
+```
+
+```r
+head(r[order(r$rel.err, decreasing = FALSE),], 10)
+```
+
+```
+##        start.station.id end.station.id tripduration est.time est.distance
+## 155621              255            467    19.416667     1320          3.7
+## 130544              243            255    26.550000     1500          4.0
+## 155618              255            243    26.783333     1440          4.0
+## 155619              255            344    39.600000     1920          5.2
+## 155622              255            467    30.633333     1320          3.7
+## 155620              255            344    45.300000     1920          5.2
+## 274898              314            255    48.800000     1860          5.1
+## 274897              314            255    49.916667     1860          5.1
+## 181753              271            523     1.166667       37          6.1
+## 853190              521            337     1.100000       27          5.1
+##           error   rel.err
+## 155621 66.98283 -66.98283
+## 130544 55.49718 -55.49718
+## 155618 52.76478 -52.76478
+## 155619 47.48485 -47.48485
+## 155622 42.09032 -42.09032
+## 155620 41.38411 -41.38411
+## 274898 37.11475 -37.11475
+## 274897 36.26210 -36.26210
+## 181753 30.71429 -30.71429
+## 853190 23.54545 -23.54545
+```
+
+The errors close to $1$ represent trips which the rider had the bike out for an extended period of
+time, up to 34 days (as seen previously). It's the rows with a high negative relative error that are
+problematic. We'll also look at the theoretical speed required for these rows to hold true.
+
+
+```r
+problems <- r[r$rel.err < -3, ]
+problems$thr.mph <- 60 * problems$est.distance / problems$tripduration 
+head(problems[order(problems$thr.mph, decreasing = T),], 10)
+```
+
+```
+##        start.station.id end.station.id tripduration est.time est.distance
+## 181753              271            523     1.166667       37          6.1
+## 853190              521            337     1.100000       27          5.1
+## 750472              496            351     1.066667       24          4.3
+## 931747               72             83     2.333333       42          7.5
+## 929566               72            328     1.133333       21          3.5
+## 260414              307            354     1.250000       20          3.2
+## 515624              426            317     1.116667       20          2.8
+## 39212               153            356     1.566667       20          3.7
+## 393478              368           2021     1.000000       14          2.3
+## 169396              264            523     1.666667       23          3.7
+##           error   rel.err  thr.mph
+## 181753 30.71429 -30.71429 313.7143
+## 853190 23.54545 -23.54545 278.1818
+## 750472 21.50000 -21.50000 241.8750
+## 931747 17.00000 -17.00000 192.8571
+## 929566 17.52941 -17.52941 185.2941
+## 260414 15.00000 -15.00000 153.6000
+## 515624 16.91045 -16.91045 150.4478
+## 39212  11.76596 -11.76596 141.7021
+## 393478 13.00000 -13.00000 138.0000
+## 169396 12.80000 -12.80000 133.2000
+```
+
+It's safe to say no one is maintaining a speed over 20 MPH on a Citi Bike, including checking out
+and parking. The "under-20" trips represent only 3 of the 490 rows here, which is due to Google Maps
+distance APIs over-estimating trip time against traffic. There appears to be a pattern of the same
+station id's repeating.
+
+
+```r
+offenders <- rbind(problems %>% group_by(end.station.id) %>% dplyr::summarize(n = n()) %>% 
+             arrange(desc(n)) %>% select(station = end.station.id, n = n),
+          problems %>% group_by(start.station.id) %>% dplyr::summarize(n = n()) %>% 
+            arrange(desc(n)) %>% select(station = start.station.id, n = n))
+head(offenders %>% group_by(station) %>% summarize(total = sum(n)) %>% arrange(desc(total)), 20)
+```
+
+```
+## Source: local data frame [20 x 2]
+## 
+##    station total
+##      (chr) (int)
+## 1      279   268
+## 2      151    94
+## 3      316    65
+## 4      152    53
+## 5      224    38
+## 6      268    36
+## 7      376    35
+## 8      351    27
+## 9      306    26
+## 10     250    21
+## 11     426    19
+## 12     147    16
+## 13     259    13
+## 14     264    11
+## 15     315    11
+## 16     337    10
+## 17      82     9
+## 18     255     8
+## 19     303     8
+## 20     348     8
+```
+
+It appears there may be data corruption leading to 
+a large number of erroroneous records in these top 15 results. The top offender is station 279.
+
+
+```r
+s.279 <- rbind(problems %>% filter(end.station.id == 279) %>% group_by(start.station.id) %>% 
+             dplyr::summarize(n = n()) %>% arrange(desc(n)) %>%  
+             select(station = start.station.id, n = n),
+          problems %>% filter(start.station.id == 279) %>% group_by(end.station.id) %>% 
+            dplyr::summarize(n = n()) %>% arrange(desc(n)) %>% 
+            select(station = end.station.id, n = n))
+s.279 <- s.279 %>% group_by(station) %>% summarize(total = sum(n)) %>% arrange(desc(total))
+
+dat.279 <- unique(distancePairs[distancePairs$start.station.id %in% s.279$station, 
+                            c("start.station.latitude", "start.station.longitude"), with = FALSE])
+dat.279$loc <- "start"
+dat.279 <- rbind(dat.279, cbind(unique(
+                                distancePairs[distancePairs$start.station.id == 279, 
+                                              c("start.station.latitude", "start.station.longitude"), 
+                                              with = FALSE]),
+                                loc = "end"))
+mymap13 <- get_map(location = "40.72417399459069,-73.98639034958494", zoom = 13, 
+                   maptype = "toner-lines")
+```
+
+```
+## maptype = "toner-lines" is only available with source = "stamen".
+## resetting to source = "stamen"...
+## Map from URL : http://maps.googleapis.com/maps/api/staticmap?center=40.72417399459069,-73.98639034958494&zoom=13&size=640x640&scale=2&maptype=terrain&sensor=false
+## Information from URL : http://maps.googleapis.com/maps/api/geocode/json?address=40.72417399459069,-73.98639034958494&sensor=false
+## Map from URL : http://tile.stamen.com/toner-lines/13/2411/3078.png
+## Map from URL : http://tile.stamen.com/toner-lines/13/2412/3078.png
+## Map from URL : http://tile.stamen.com/toner-lines/13/2413/3078.png
+## Map from URL : http://tile.stamen.com/toner-lines/13/2411/3079.png
+## Map from URL : http://tile.stamen.com/toner-lines/13/2412/3079.png
+## Map from URL : http://tile.stamen.com/toner-lines/13/2413/3079.png
+## Map from URL : http://tile.stamen.com/toner-lines/13/2411/3080.png
+## Map from URL : http://tile.stamen.com/toner-lines/13/2412/3080.png
+## Map from URL : http://tile.stamen.com/toner-lines/13/2413/3080.png
+```
+
+```r
+inv <- readPNG("invert.png")
+ggmap(mymap13, extent = "device") + 
+  inset_raster(inv, xmin = -74.048, xmax = -73.928, ymin = 40.68, ymax = 40.766) +
+  geom_point(aes(x = as.numeric(start.station.longitude), y = as.numeric(start.station.latitude),
+                 color = loc), data = dat.279, size = 6, alpha = 0.6) +
+  scale_colour_manual(values=c("blue", "red"))
+```
+
+![](figure/unnamed-chunk-30-1.png) 
+
+It appears all the problematic trips with station 279 are starting or ending near the financial
+district and Tribeca. The second highest offender is station 151.
+
+
+```r
+s.151 <- rbind(problems %>% filter(end.station.id == 151) %>% group_by(start.station.id) %>% 
+             dplyr::summarize(n = n()) %>% arrange(desc(n)) %>%  
+             select(station = start.station.id, n = n),
+          problems %>% filter(start.station.id == 151) %>% group_by(end.station.id) %>% 
+            dplyr::summarize(n = n()) %>% arrange(desc(n)) %>% 
+            select(station = end.station.id, n = n))
+s.151 <- s.151 %>% group_by(station) %>% summarize(total = sum(n)) %>% arrange(desc(total))
+
+dat.151 <- unique(distancePairs[distancePairs$start.station.id %in% s.151$station, 
+                            c("start.station.latitude", "start.station.longitude"), with = FALSE])
+dat.151$loc <- "start"
+dat.151 <- rbind(dat.151, cbind(unique(
+                                distancePairs[distancePairs$start.station.id == 151, 
+                                              c("start.station.latitude", "start.station.longitude"), 
+                                              with = FALSE]),
+                                loc = "end"))
+
+ggmap(mymap13, extent = "device") + 
+  inset_raster(inv, xmin = -74.048, xmax = -73.928, ymin = 40.68, ymax = 40.766) +
+  geom_point(aes(x = as.numeric(start.station.longitude), y = as.numeric(start.station.latitude),
+                 color = loc), 
+                  data = dat.151, size = 6, alpha = 0.6)+
+  scale_colour_manual(values=c("blue", "red"))
+```
+
+![](figure/unnamed-chunk-31-1.png) 
+
+All problematic trips with station 151 are starting or ending very close by, in soho. 
+
+These trips need to be removed from the data to get a sense of the Google Maps accuracy. 
+
+
+```r
+r <- r[r$rel.err > -3, ]
+summary(r$rel.err)
+```
+
+```
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
+## -2.9860  0.0000  0.1845  0.1771  0.3684  0.9999       1
+```
+
+```r
+hist(r$rel.err, breaks = 50)
+```
+
+![](figure/unnamed-chunk-32-1.png) 
+
+```r
+quantile(r$rel.err, probs = seq(0, 1, 0.025), na.rm = TRUE)
+```
+
+```
+##          0%        2.5%          5%        7.5%         10%       12.5% 
+## -2.98601399 -0.50000000 -0.34185304 -0.25560538 -0.19601329 -0.14911081 
+##         15%       17.5%         20%       22.5%         25%       27.5% 
+## -0.11111111 -0.07784431 -0.04956268 -0.02345416  0.00000000  0.02211874 
+##         30%       32.5%         35%       37.5%         40%       42.5% 
+##  0.04282116  0.06250000  0.08163265  0.09959072  0.11764706  0.13436863 
+##         45%       47.5%         50%       52.5%         55%       57.5% 
+##  0.15125136  0.16795069  0.18446602  0.20106525  0.21787709  0.23469388 
+##         60%       62.5%         65%       67.5%         70%       72.5% 
+##  0.25187032  0.26940639  0.28741093  0.30609098  0.32584270  0.34640523 
+##         75%       77.5%         80%       82.5%         85%       87.5% 
+##  0.36842105  0.39291737  0.41935484  0.44881890  0.48275862  0.52164009 
+##         90%       92.5%         95%       97.5%        100% 
+##  0.56834532  0.62686567  0.70573811  0.82326951  0.99985827
+```
+
+The median error is 18.4%. 
+The histogram is upper bounded by the asymptotic at 1, and lower bounded
+at the cutoff at -3 that was imposed. However we see almost exactly 95% of the data lies within 2
+standard deviations, in what appears to be a close-to-normal distribution
+
+
+```r
+mean(r$rel.err, na.rm = TRUE) + c(-1, 1) * 1.96 * sd(r$rel.err, na.rm = TRUE)
+```
+
+```
+## [1] -0.4648839  0.8191754
+```
+
+While this does illuminate the problems of bad data, the relative error is a poor measure of 
+prediction accuracy. It is asymmetric and biased, effectively weighting over-estimates much more 
+than under-estimates. This has to do with the fact that the equation puts an upper bound asymptotic
+at 1, while the lower is unbounded. Changing the denominator to the predicted value yields the same
+problem in the opposite direction. Here, the choice is to use the Balanced Relative Error (Miyazaki 
+et al. 1991), which compares against both over and under-estimation. We lose no fidelity of 
+magnitude, as it combines MRE and MER. 
+
+
+```r
+r <- rec.trip.month[rec.trip.month$start.station.id != rec.trip.month$end.station.id, ]
+r <- r[, c("start.station.id", "end.station.id", "tripduration", "est.time", "est.distance")]
+r$tripduration <- r$tripduration/60
+r <- r[complete.cases(r), ]
+#ln(q) estimates the geometric mean = 1
+r$bre <- (r$tripduration - r$est.time)/pmin(r$tripduration, r$est.time)
+# Positive BRE (Balanced Relative Error) indicates a trip took longer than the estimate, 
+# and the coverse is also true
+summary(r$bre)
+```
+
+```
+##     Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
+##  -66.980    0.000    0.226    0.837    0.583 7055.000
+```
+
+```r
+min <- quantile(r$bre, 0.025)
+max <- quantile(r$bre, 0.975)
+out.min <- r$bre < min
+out.max <- r$bre > max
+r <- r[!(out.min | out.max),]
+hist(r$bre)
+```
+
+![](figure/unnamed-chunk-34-1.png) 
+
+The standard IQR estimate for outlayers yields about 9% of total rows. Instead, a subset is taken 
+on the middle 95%.
+
+#Fix binwidths to accuractely see bars. Currently looks like 20% per bar
