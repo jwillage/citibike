@@ -1159,7 +1159,8 @@ than under-estimates. This has to do with the fact that the equation puts an upp
 at 1, while the lower is unbounded. Changing the denominator to the predicted value yields the same
 problem in the opposite direction. Here, the choice is to use the Balanced Relative Error (Miyazaki 
 et al. 1991), which compares against both over and under-estimation. We lose no fidelity of 
-magnitude, as it combines MRE and MER. 
+magnitude, as it combines MRE and MER (Another candidate was Ln(Q) (Tofallis 2014), which provides
+good symmetry, but less interpretable results). 
 
 
 ```r
@@ -1167,30 +1168,30 @@ r <- rec.trip.month[rec.trip.month$start.station.id != rec.trip.month$end.statio
 r <- r[, c("start.station.id", "end.station.id", "tripduration", "est.time", "est.distance")]
 r$tripduration <- r$tripduration/60
 r <- r[complete.cases(r), ]
-#ln(q) estimates the geometric mean = 1
-r$bre <- (r$tripduration - r$est.time)/pmin(r$tripduration, r$est.time)
+r$BRE <- (r$tripduration - r$est.time)/pmin(r$tripduration, r$est.time)
 # Positive BRE (Balanced Relative Error) indicates a trip took longer than the estimate, 
 # and the coverse is also true
-summary(r$bre)
+summary(r$BRE)
 ```
 
 ```
 ##     Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
-##  -66.980    0.000    0.226    0.837    0.583 7055.000
+##  -30.710    0.000    0.226    0.842    0.583 7055.000
 ```
 
 ```r
-min <- quantile(r$bre, 0.025)
-max <- quantile(r$bre, 0.975)
-out.min <- r$bre < min
-out.max <- r$bre > max
+min <- quantile(r$BRE, 0.025)
+max <- quantile(r$BRE, 0.975)
+out.min <- r$BRE < min
+out.max <- r$BRE > max
 r <- r[!(out.min | out.max),]
-hist(r$bre)
+hist(r$BRE, xaxt = "n")
+axis(1, at = seq(-0.6, 5, by = 0.2), labels = seq(-0.6, 5, by = 0.2), las = 2)
 ```
 
 ![](figure/unnamed-chunk-34-1.png) 
 
 The standard IQR estimate for outlayers yields about 9% of total rows. Instead, a subset is taken 
-on the middle 95%.
+on the middle 95%. The distribution appears to be a reasonable proxy for the actual duration of 
+trips. 
 
-#Fix binwidths to accuractely see bars. Currently looks like 20% per bar
