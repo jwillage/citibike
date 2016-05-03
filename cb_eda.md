@@ -4,7 +4,11 @@ November 18, 2015
 
 
 ```
-## Warning: package 'ggplot2' was built under R version 3.2.3
+## Warning: package 'ggplot2' was built under R version 3.2.4
+```
+
+```
+## Warning: package 'knitr' was built under R version 3.2.3
 ```
 
 ```
@@ -1191,7 +1195,7 @@ axis(1, at = seq(-0.6, 5, by = 0.2), labels = seq(-0.6, 5, by = 0.2), las = 2)
 
 ![](figure/unnamed-chunk-34-1.png) 
 
-The standard IQR estimate for outlayers yields about 9% of total rows. Instead, a subset is taken 
+The standard IQR estimate for outliers yields about 9% of total rows. Instead, a subset is taken 
 on the middle 95%. The distribution appears to be a reasonable proxy for the actual duration of 
 trips. 
 
