@@ -7,7 +7,7 @@ output:
     keep_md: yes
 ---
 
-```{r setoptions, echo=FALSE, message=FALSE}
+```{r setoptions, include = FALSE}
 library(dplyr)
 library(lubridate)
 library(ggplot2)

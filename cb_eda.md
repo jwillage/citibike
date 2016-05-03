@@ -3,17 +3,6 @@ Joe Willage
 November 18, 2015  
 
 
-```
-## Warning: package 'ggplot2' was built under R version 3.2.4
-```
-
-```
-## Warning: package 'knitr' was built under R version 3.2.3
-```
-
-```
-## Warning: package 'ggmap' was built under R version 3.2.3
-```
 
 Given a trip month file, explore some of the properties
 
